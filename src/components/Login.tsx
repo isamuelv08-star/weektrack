@@ -196,25 +196,7 @@ export default function Login({ onLogin }: LoginProps) {
             Tablero de Colaboración de Alta Fidelidad en Tiempo Real para Agencias y Clientes
           </motion.p>
 
-          {/* Database Connection Status Badge */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.3 }}
-            className="mt-3"
-          >
-            {isSupabaseConfigured ? (
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-950/60 border border-emerald-900/50 text-emerald-400 rounded-full text-[10px] font-black">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                Base de Datos Supabase Activa
-              </span>
-            ) : (
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-950/60 border border-amber-900/50 text-amber-400 rounded-full text-[10px] font-black">
-                <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-                Modo Demostración (Simulado)
-              </span>
-            )}
-          </motion.div>
+
         </div>
 
         {/* Main Card */}
