@@ -508,70 +508,8 @@ export default function App() {
           </button>
         </div>
 
-        {/* Test Collaborative Roles Controller */}
-        <div className="px-4 py-4 flex-1 overflow-y-auto space-y-4 border-t border-slate-800/60">
-          {isSidebarOpen && (
-            <div className="bg-slate-850 rounded-2xl p-3.5 border border-slate-800 space-y-2.5">
-              <div className="flex items-center gap-1 text-[10px] text-slate-400 font-bold uppercase tracking-wider">
-                <Shield className="w-3.5 h-3.5 text-blue-400" />
-                <span>Simulador de Roles</span>
-              </div>
-              <p className="text-[10px] text-slate-400 leading-normal">
-                Cambia el rol actual para auditar vistas, checklists y escribir comentarios como Líder, Equipo o Cliente:
-              </p>
-              
-              <div className="grid grid-cols-3 gap-1 pt-1">
-                <button
-                  onClick={() => {
-                    setActiveUserRole('Admin');
-                    setActiveUserName('Samuel V. (iGenius)');
-                  }}
-                  className={`py-1 text-[9px] font-bold rounded-lg border transition-all cursor-pointer ${
-                    activeUserRole === 'Admin'
-                      ? 'bg-blue-600 text-white border-blue-500'
-                      : 'bg-slate-800 text-slate-400 border-slate-700/60 hover:bg-slate-750'
-                  }`}
-                  title="Samuel V. (Admin)"
-                >
-                  Admin
-                </button>
-                <button
-                  onClick={() => {
-                    setActiveUserRole('Equipo');
-                    setActiveUserName('Carlos Gómez (Diseño)');
-                  }}
-                  className={`py-1 text-[9px] font-bold rounded-lg border transition-all cursor-pointer ${
-                    activeUserRole === 'Equipo'
-                      ? 'bg-indigo-600 text-white border-indigo-500'
-                      : 'bg-slate-800 text-slate-400 border-slate-700/60 hover:bg-slate-750'
-                  }`}
-                  title="Carlos Gómez (Diseño)"
-                >
-                  Equipo
-                </button>
-                <button
-                  onClick={() => {
-                    setActiveUserRole('Cliente');
-                    setActiveUserName('Sofía Pasquel (Gerente)');
-                  }}
-                  className={`py-1 text-[9px] font-bold rounded-lg border transition-all cursor-pointer ${
-                    activeUserRole === 'Cliente'
-                      ? 'bg-emerald-600 text-white border-emerald-500'
-                      : 'bg-slate-800 text-slate-400 border-slate-700/60 hover:bg-slate-750'
-                  }`}
-                  title="Sofía Pasquel (Gerente)"
-                >
-                  Cliente
-                </button>
-              </div>
-
-              <div className="pt-2 text-[10px] flex items-center justify-between text-slate-400 font-medium">
-                <span>Sesión:</span>
-                <span className="text-white font-bold">{activeUserName}</span>
-              </div>
-            </div>
-          )}
-        </div>
+        {/* Spacer layout */}
+        <div className="flex-1" />
 
         {/* Collapser controller */}
         <div className="p-3 border-t border-slate-800 flex items-center justify-center flex-shrink-0">
@@ -616,6 +554,39 @@ export default function App() {
             {/* Selector de Cliente Global & Botones de Acción */}
             <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto justify-end">
               
+              {/* Avatares de Colaboradores Activos en Tiempo Real */}
+              <div className="hidden sm:flex items-center gap-3 bg-slate-50 border border-slate-200/60 rounded-full py-1 pl-2 pr-3.5 mr-1.5 shadow-xs">
+                <div className="flex gap-1.5">
+                  <div 
+                    className="inline-block h-7 w-7 rounded-full ring-2 ring-blue-100 bg-blue-500 text-white text-[9.5px] font-extrabold flex items-center justify-center relative cursor-help transition-all duration-200 hover:scale-105 hover:-translate-y-0.5"
+                    title="Samuel V. (Admin) - Conectado"
+                  >
+                    SV
+                    <span className="absolute -bottom-0.5 -right-0.5 block h-2 w-2 rounded-full ring-2 ring-white bg-emerald-500 animate-pulse" />
+                  </div>
+                  <div 
+                    className="inline-block h-7 w-7 rounded-full ring-2 ring-indigo-100 bg-indigo-500 text-white text-[9.5px] font-extrabold flex items-center justify-center relative cursor-help transition-all duration-200 hover:scale-105 hover:-translate-y-0.5"
+                    title="Carlos Gómez (Equipo Diseño) - Conectado"
+                  >
+                    CG
+                    <span className="absolute -bottom-0.5 -right-0.5 block h-2 w-2 rounded-full ring-2 ring-white bg-emerald-500 animate-pulse" />
+                  </div>
+                  <div 
+                    className="inline-block h-7 w-7 rounded-full ring-2 ring-emerald-100 bg-emerald-500 text-white text-[9.5px] font-extrabold flex items-center justify-center relative cursor-help transition-all duration-200 hover:scale-105 hover:-translate-y-0.5"
+                    title="Sofía Pasquel (Gerente Cliente) - Conectada"
+                  >
+                    SP
+                    <span className="absolute -bottom-0.5 -right-0.5 block h-2 w-2 rounded-full ring-2 ring-white bg-emerald-500 animate-pulse" />
+                  </div>
+                </div>
+                <div className="text-left flex items-center border-l border-slate-200/80 pl-2.5">
+                  <span className="text-[9px] text-emerald-600 font-extrabold flex items-center gap-1.5 tracking-wider uppercase">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    3 ACTIVOS
+                  </span>
+                </div>
+              </div>
+
               {/* Info actual del rol */}
               <div className="hidden lg:flex items-center gap-2 bg-slate-100 px-3 py-1.5 rounded-xl border border-slate-200">
                 <UserCheck className="w-3.5 h-3.5 text-blue-600" />
@@ -748,20 +719,36 @@ export default function App() {
                       </p>
                     </div>
                   </div>
-                  <button
-                    onClick={() => handleCopyLink('Admin')}
-                    className="w-full py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-                  >
-                    {copiedLink === 'Admin_copied' ? (
-                      <>
-                        <Check className="w-4 h-4 text-emerald-400" /> ¡Copiado en Admin!
-                      </>
-                    ) : (
-                      <>
-                        <Share2 className="w-3.5 h-3.5" /> Copiar Link Admin
-                      </>
-                    )}
-                  </button>
+                  <div className="flex flex-col gap-2">
+                    <button
+                      onClick={() => handleCopyLink('Admin')}
+                      className="w-full py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      {copiedLink === 'Admin_copied' ? (
+                        <>
+                          <Check className="w-4 h-4 text-emerald-400" /> ¡Copiado en Admin!
+                        </>
+                      ) : (
+                        <>
+                          <Share2 className="w-3.5 h-3.5" /> Copiar Link Admin
+                        </>
+                      )}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setActiveUserRole('Admin');
+                        setActiveUserName('Samuel V. (iGenius)');
+                      }}
+                      className={`w-full py-1.5 border rounded-xl text-[10px] font-bold transition-all cursor-pointer flex items-center justify-center gap-1 ${
+                        activeUserRole === 'Admin'
+                          ? 'bg-blue-50 text-blue-700 border-blue-200/80'
+                          : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                      }`}
+                    >
+                      <UserCheck className="w-3.5 h-3.5" />
+                      {activeUserRole === 'Admin' ? 'Modo Admin Activo' : 'Simular Modo Admin'}
+                    </button>
+                  </div>
                 </div>
 
                 {/* Team Editor Link */}
@@ -777,20 +764,36 @@ export default function App() {
                       </p>
                     </div>
                   </div>
-                  <button
-                    onClick={() => handleCopyLink('Equipo')}
-                    className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-                  >
-                    {copiedLink === 'Equipo_copied' ? (
-                      <>
-                        <Check className="w-4 h-4 text-emerald-400" /> ¡Copiado de Equipo!
-                      </>
-                    ) : (
-                      <>
-                        <Share2 className="w-3.5 h-3.5" /> Copiar Link Equipo
-                      </>
-                    )}
-                  </button>
+                  <div className="flex flex-col gap-2">
+                    <button
+                      onClick={() => handleCopyLink('Equipo')}
+                      className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      {copiedLink === 'Equipo_copied' ? (
+                        <>
+                          <Check className="w-4 h-4 text-emerald-400" /> ¡Copiado de Equipo!
+                        </>
+                      ) : (
+                        <>
+                          <Share2 className="w-3.5 h-3.5" /> Copiar Link Equipo
+                        </>
+                      )}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setActiveUserRole('Equipo');
+                        setActiveUserName('Carlos Gómez (Diseño)');
+                      }}
+                      className={`w-full py-1.5 border rounded-xl text-[10px] font-bold transition-all cursor-pointer flex items-center justify-center gap-1 ${
+                        activeUserRole === 'Equipo'
+                          ? 'bg-indigo-50 text-indigo-700 border-indigo-200/80'
+                          : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                      }`}
+                    >
+                      <UserCheck className="w-3.5 h-3.5" />
+                      {activeUserRole === 'Equipo' ? 'Modo Equipo Activo' : 'Simular Modo Equipo'}
+                    </button>
+                  </div>
                 </div>
 
                 {/* Client Link */}
@@ -806,20 +809,36 @@ export default function App() {
                       </p>
                     </div>
                   </div>
-                  <button
-                    onClick={() => handleCopyLink('Cliente')}
-                    className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-                  >
-                    {copiedLink === 'Cliente_copied' ? (
-                      <>
-                        <Check className="w-4 h-4 text-emerald-400" /> ¡Copiado de Cliente!
-                      </>
-                    ) : (
-                      <>
-                        <Share2 className="w-3.5 h-3.5" /> Copiar Link de Cliente
-                      </>
-                    )}
-                  </button>
+                  <div className="flex flex-col gap-2">
+                    <button
+                      onClick={() => handleCopyLink('Cliente')}
+                      className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      {copiedLink === 'Cliente_copied' ? (
+                        <>
+                          <Check className="w-4 h-4 text-emerald-400" /> ¡Copiado de Cliente!
+                        </>
+                      ) : (
+                        <>
+                          <Share2 className="w-3.5 h-3.5" /> Copiar Link de Cliente
+                        </>
+                      )}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setActiveUserRole('Cliente');
+                        setActiveUserName('Sofía Pasquel (Gerente)');
+                      }}
+                      className={`w-full py-1.5 border rounded-xl text-[10px] font-bold transition-all cursor-pointer flex items-center justify-center gap-1 ${
+                        activeUserRole === 'Cliente'
+                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200/80'
+                          : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                      }`}
+                    >
+                      <UserCheck className="w-3.5 h-3.5" />
+                      {activeUserRole === 'Cliente' ? 'Modo Cliente Activo' : 'Simular Modo Cliente'}
+                    </button>
+                  </div>
                 </div>
 
               </div>
