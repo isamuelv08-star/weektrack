@@ -14,6 +14,7 @@ interface TaskModalProps {
   defaultDate?: string; // Por si hacemos doble click o click en un día del calendario
   activeUserRole: 'Admin' | 'Equipo' | 'Cliente';
   activeUserName: string;
+  isApproved?: boolean;
 }
 
 const TASK_TYPES: TaskType[] = ['Contenido', 'Pauta', 'CRM', 'Reunión', 'Entrega', 'Administrativo', 'Otro'];
@@ -47,6 +48,7 @@ export default function TaskModal({
   defaultDate,
   activeUserRole,
   activeUserName,
+  isApproved = true,
 }: TaskModalProps) {
   const [companyId, setCompanyId] = useState('');
   const [title, setTitle] = useState('');
@@ -691,9 +693,14 @@ export default function TaskModal({
                   <button
                     id="save-task-btn"
                     type="submit"
-                    className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl text-xs transition-colors cursor-pointer"
+                    disabled={!isApproved}
+                    className={`px-5 py-2 font-semibold rounded-xl text-xs transition-colors cursor-pointer ${
+                      !isApproved 
+                        ? 'bg-slate-200 text-slate-400 cursor-not-allowed border border-slate-350' 
+                        : 'bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-500/10'
+                    }`}
                   >
-                    {task ? 'Guardar Cambios' : 'Crear Tarea'}
+                    {!isApproved ? 'Esperando Aprobación...' : task ? 'Guardar Cambios' : 'Crear Tarea'}
                   </button>
                 )}
               </div>

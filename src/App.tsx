@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Company, Task, TaskStatus, TaskPriority, TaskType } from './types';
+import { Company, Task, TaskStatus, TaskPriority, TaskType, AccessRequest } from './types';
 import { INITIAL_COMPANIES, INITIAL_TASKS } from './initialData';
 
 // Modales
@@ -7,6 +7,10 @@ import CompanyModal from './components/CompanyModal';
 import TaskModal from './components/TaskModal';
 import ReportModal from './components/ReportModal';
 import SettingsModal from './components/SettingsModal';
+
+// Componentes de Seguridad y Acceso
+import Login from './components/Login';
+import AccessDenied from './components/AccessDenied';
 
 // Vistas
 import CalendarView from './components/CalendarView';
@@ -46,6 +50,8 @@ import {
   Info,
   ChevronLeft,
   ChevronRight,
+  LogOut,
+  Radio,
 } from 'lucide-react';
 import { motion } from 'motion/react';
 
@@ -119,12 +125,24 @@ export default function App() {
   const [defaultPriority, setDefaultPriority] = useState<string>(() => localStorage.getItem('wt_default_priority') || 'Media');
   const [enableAlerts, setEnableAlerts] = useState<boolean>(() => localStorage.getItem('wt_enable_alerts') !== 'false');
 
-  // --- ESTADOS DE COLABORACIÓN Y CONTROL DE ROLES ---
+  // --- ESTADOS DE COLABORACIÓN, SEGURIDAD Y CONTROL DE ROLES ---
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('role')) return true; // Auto-acceso por enlace de compartir
+    return sessionStorage.getItem('wt_authenticated') === 'true';
+  });
+
   const [activeUserRole, setActiveUserRole] = useState<'Admin' | 'Equipo' | 'Cliente'>(() => {
     const params = new URLSearchParams(window.location.search);
     const roleParam = params.get('role');
     if (roleParam === 'cliente' || roleParam === 'Cliente') return 'Cliente';
     if (roleParam === 'equipo' || roleParam === 'Equipo') return 'Equipo';
+    
+    // Buscar en sesión
+    const sessionRole = sessionStorage.getItem('wt_current_user_role');
+    if (sessionRole === 'Cliente' || sessionRole === 'Equipo' || sessionRole === 'Admin') {
+      return sessionRole as 'Admin' | 'Equipo' | 'Cliente';
+    }
     return 'Admin';
   });
 
@@ -132,9 +150,26 @@ export default function App() {
     const params = new URLSearchParams(window.location.search);
     const nameParam = params.get('name');
     if (nameParam) return nameParam;
+
+    const sessionName = sessionStorage.getItem('wt_current_user_name');
+    if (sessionName) return sessionName;
+
     if (activeUserRole === 'Cliente') return 'Sofía Pasquel (Gerente)';
     if (activeUserRole === 'Equipo') return 'Carlos Gómez (Diseño)';
     return 'Samuel V. (iGenius)';
+  });
+
+  const [accessRequests, setAccessRequests] = useState<AccessRequest[]>(() => {
+    const local = localStorage.getItem('wt_access_requests');
+    if (local) {
+      try {
+        return JSON.parse(local);
+      } catch (e) {}
+    }
+    return [
+      { id: 'req-1', name: 'Carlos Gómez (Diseño)', role: 'Equipo', status: 'pending', timestamp: 'Hace 2 horas' },
+      { id: 'req-2', name: 'Sofía Pasquel (Gerente)', role: 'Cliente', status: 'pending', timestamp: 'Hace 5 minutos' }
+    ];
   });
 
   const [copiedLink, setCopiedLink] = useState<string | boolean>(false);
@@ -153,18 +188,63 @@ export default function App() {
     const companyParam = params.get('company');
     const nameParam = params.get('name');
     
+    let resolvedRole: 'Admin' | 'Equipo' | 'Cliente' | null = null;
+    let resolvedName = '';
+
     if (roleParam === 'cliente' || roleParam === 'Cliente') {
+      resolvedRole = 'Cliente';
+      resolvedName = nameParam || 'Sofía Pasquel (Gerente)';
       setActiveUserRole('Cliente');
       if (companyParam) {
         setSelectedCompanyId(companyParam);
       }
-      setActiveUserName(nameParam || 'Sofía Pasquel (Gerente)');
+      setActiveUserName(resolvedName);
+      setIsAuthenticated(true);
     } else if (roleParam === 'equipo' || roleParam === 'Equipo') {
+      resolvedRole = 'Equipo';
+      resolvedName = nameParam || 'Carlos Gómez (Diseño)';
       setActiveUserRole('Equipo');
-      setActiveUserName(nameParam || 'Carlos Gómez (Diseño)');
+      setActiveUserName(resolvedName);
+      setIsAuthenticated(true);
     } else if (roleParam === 'admin' || roleParam === 'Admin') {
+      resolvedRole = 'Admin';
+      resolvedName = nameParam || 'Samuel V. (Admin)';
       setActiveUserRole('Admin');
-      setActiveUserName(nameParam || 'Samuel V. (Admin)');
+      setActiveUserName(resolvedName);
+      setIsAuthenticated(true);
+    }
+
+    if (resolvedRole) {
+      sessionStorage.setItem('wt_authenticated', 'true');
+      sessionStorage.setItem('wt_current_user_name', resolvedName);
+      sessionStorage.setItem('wt_current_user_role', resolvedRole);
+
+      // Auto-registrar solicitud de acceso en estado "pending" si no es Admin
+      if (resolvedRole !== 'Admin') {
+        const localRequestsStr = localStorage.getItem('wt_access_requests');
+        let currentReqs: AccessRequest[] = [];
+        try {
+          currentReqs = localRequestsStr ? JSON.parse(localRequestsStr) : [];
+        } catch (e) {
+          currentReqs = [];
+        }
+
+        const index = currentReqs.findIndex(r => r.role === resolvedRole);
+        if (index === -1) {
+          const newReq: AccessRequest = {
+            id: 'req-' + Date.now(),
+            name: resolvedName,
+            role: resolvedRole,
+            status: 'pending', // Inicia en pendiente para ser aprobado por el Admin
+            timestamp: 'Hace unos instantes'
+          };
+          const updatedReqs = [...currentReqs, newReq];
+          localStorage.setItem('wt_access_requests', JSON.stringify(updatedReqs));
+          setAccessRequests(updatedReqs);
+        } else {
+          setAccessRequests(currentReqs);
+        }
+      }
     }
 
     const events = [
@@ -230,6 +310,139 @@ export default function App() {
     localStorage.setItem('wt_enable_alerts', String(enableAlerts));
   }, [enableAlerts]);
 
+  // Guardar solicitudes de acceso de co-editores en localStorage
+  useEffect(() => {
+    localStorage.setItem('wt_access_requests', JSON.stringify(accessRequests));
+  }, [accessRequests]);
+
+  // Escuchar cambios de localStorage en tiempo real para sincronización multipestaña (Event + Polling)
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'cronograma_tasks' && e.newValue) {
+        try {
+          setTasks(JSON.parse(e.newValue));
+        } catch (err) {}
+      }
+      if (e.key === 'cronograma_companies' && e.newValue) {
+        try {
+          setCompanies(JSON.parse(e.newValue));
+        } catch (err) {}
+      }
+      if (e.key === 'wt_access_requests' && e.newValue) {
+        try {
+          setAccessRequests(JSON.parse(e.newValue));
+        } catch (err) {}
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+
+    // Polling de respaldo para entornos sandboxed/iframes donde el evento 'storage' está restringido
+    let lastTasksStr = localStorage.getItem('cronograma_tasks') || '[]';
+    let lastCompaniesStr = localStorage.getItem('cronograma_companies') || '[]';
+    let lastRequestsStr = localStorage.getItem('wt_access_requests') || '[]';
+
+    const interval = setInterval(() => {
+      const storedTasksStr = localStorage.getItem('cronograma_tasks');
+      const storedCompaniesStr = localStorage.getItem('cronograma_companies');
+      const storedRequestsStr = localStorage.getItem('wt_access_requests');
+
+      if (storedTasksStr && storedTasksStr !== lastTasksStr) {
+        try {
+          setTasks(JSON.parse(storedTasksStr));
+          lastTasksStr = storedTasksStr;
+        } catch (err) {}
+      }
+      if (storedCompaniesStr && storedCompaniesStr !== lastCompaniesStr) {
+        try {
+          setCompanies(JSON.parse(storedCompaniesStr));
+          lastCompaniesStr = storedCompaniesStr;
+        } catch (err) {}
+      }
+      if (storedRequestsStr && storedRequestsStr !== lastRequestsStr) {
+        try {
+          setAccessRequests(JSON.parse(storedRequestsStr));
+          lastRequestsStr = storedRequestsStr;
+        } catch (err) {}
+      }
+    }, 1000);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      clearInterval(interval);
+    };
+  }, []);
+
+  // Handlers de Sesión y Control de Accesos
+  const handleLogin = (role: 'Admin' | 'Equipo' | 'Cliente', name: string) => {
+    sessionStorage.setItem('wt_authenticated', 'true');
+    sessionStorage.setItem('wt_current_user_name', name);
+    sessionStorage.setItem('wt_current_user_role', role);
+    
+    setActiveUserRole(role);
+    setActiveUserName(name);
+    setIsAuthenticated(true);
+
+    // Asegurar que exista una solicitud si no es Admin
+    if (role !== 'Admin') {
+      const exists = accessRequests.some(r => r.role === role);
+      if (!exists) {
+        const defaultStatus = role === 'Equipo' ? 'approved' : 'pending';
+        const newReq: AccessRequest = {
+          id: 'req-' + Date.now(),
+          name,
+          role,
+          status: defaultStatus as any,
+          timestamp: 'Conectado recientemente'
+        };
+        setAccessRequests(prev => {
+          const updated = [...prev, newReq];
+          localStorage.setItem('wt_access_requests', JSON.stringify(updated));
+          return updated;
+        });
+      }
+    }
+  };
+
+  const handleLogout = () => {
+    sessionStorage.removeItem('wt_authenticated');
+    sessionStorage.removeItem('wt_current_user_name');
+    sessionStorage.removeItem('wt_current_user_role');
+    
+    // Limpiar params de URL para evitar re-logueos indeseados
+    const baseUrl = window.location.origin + window.location.pathname;
+    window.history.replaceState({}, document.title, baseUrl);
+    
+    setIsAuthenticated(false);
+  };
+
+  const handleRequestAccess = () => {
+    const exists = accessRequests.some(r => r.role === activeUserRole);
+    if (exists) {
+      setAccessRequests(prev => prev.map(r => {
+        if (r.role === activeUserRole) {
+          return { ...r, status: 'pending', timestamp: 'Hace unos instantes' };
+        }
+        return r;
+      }));
+    } else {
+      const newReq: AccessRequest = {
+        id: 'req-' + Date.now(),
+        name: activeUserName,
+        role: activeUserRole,
+        status: 'pending',
+        timestamp: 'Hace unos instantes'
+      };
+      setAccessRequests(prev => [...prev, newReq]);
+    }
+  };
+
+  // Buscar estado de acceso del usuario actual
+  const currentRequest = accessRequests.find(
+    (r) => r.role === activeUserRole && (r.name.toLowerCase().includes(activeUserName.toLowerCase().split(' ')[0]) || activeUserName.toLowerCase().includes(r.name.toLowerCase().split(' ')[0]))
+  ) || null;
+
+  const hasAccess = activeUserRole === 'Admin' || (currentRequest && currentRequest.status === 'approved');
+
   const handleResetData = () => {
     localStorage.removeItem('cronograma_companies');
     localStorage.removeItem('cronograma_tasks');
@@ -290,6 +503,11 @@ export default function App() {
 
   // Guardar Tarea (Crear o Editar)
   const handleSaveTask = (savedTask: Task) => {
+    const isApproved = activeUserRole === 'Admin' || (currentRequest && currentRequest.status === 'approved');
+    if (!isApproved) {
+      alert("Tu solicitud de acceso como co-editor aún no ha sido aprobada por el Administrador. Tienes acceso de solo lectura.");
+      return;
+    }
     const exists = tasks.some((t) => t.id === savedTask.id);
     if (exists) {
       setTasks(tasks.map((t) => (t.id === savedTask.id ? savedTask : t)));
@@ -300,6 +518,11 @@ export default function App() {
 
   // Eliminar Tarea
   const handleDeleteTask = (id: string) => {
+    const isApproved = activeUserRole === 'Admin' || (currentRequest && currentRequest.status === 'approved');
+    if (!isApproved) {
+      alert("Tu solicitud de acceso como co-editor aún no ha sido aprobada por el Administrador.");
+      return;
+    }
     setTasks(tasks.filter((t) => t.id !== id));
   };
 
@@ -324,6 +547,11 @@ export default function App() {
 
   // Cambiar estado desde el Kanban (drag and drop)
   const handleUpdateTaskStatus = (id: string, newStatus: TaskStatus) => {
+    const isApproved = activeUserRole === 'Admin' || (currentRequest && currentRequest.status === 'approved');
+    if (!isApproved) {
+      alert("Tu solicitud de acceso como co-editor aún no ha sido aprobada por el Administrador. Tienes acceso de solo lectura.");
+      return;
+    }
     setTasks(
       tasks.map((t) => {
         if (t.id === id) {
@@ -396,6 +624,10 @@ export default function App() {
     selectedType !== 'all' ||
     selectedStatus !== 'all' ||
     selectedPriority !== 'all';
+
+  if (!isAuthenticated) {
+    return <Login onLogin={handleLogin} />;
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 font-sans flex flex-col md:flex-row selection:bg-blue-100 selection:text-blue-800 overflow-hidden h-screen">
@@ -506,6 +738,16 @@ export default function App() {
             <Settings className="w-4 h-4 flex-shrink-0 text-indigo-400" />
             {isSidebarOpen && <span>Configuración de App</span>}
           </button>
+
+          {/* Botón Cerrar Sesión */}
+          <button
+            id="sidebar-logout-btn"
+            onClick={handleLogout}
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-bold text-slate-400 hover:bg-red-950/40 hover:text-red-300 transition-all cursor-pointer text-left border border-transparent hover:border-red-900/45"
+          >
+            <LogOut className="w-4 h-4 flex-shrink-0 text-red-400" />
+            {isSidebarOpen && <span>Cerrar Sesión</span>}
+          </button>
         </div>
 
         {/* Spacer layout */}
@@ -554,36 +796,70 @@ export default function App() {
             {/* Selector de Cliente Global & Botones de Acción */}
             <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto justify-end">
               
-              {/* Avatares de Colaboradores Activos en Tiempo Real */}
+              {/* Avatares de Colaboradores Activos en Tiempo Real (Dinámicos) */}
               <div className="hidden sm:flex items-center gap-3 bg-slate-50 border border-slate-200/60 rounded-full py-1 pl-2 pr-3.5 mr-1.5 shadow-xs">
                 <div className="flex gap-1.5">
+                  {/* Samuel V. (Admin) */}
                   <div 
                     className="inline-block h-7 w-7 rounded-full ring-2 ring-blue-100 bg-blue-500 text-white text-[9.5px] font-extrabold flex items-center justify-center relative cursor-help transition-all duration-200 hover:scale-105 hover:-translate-y-0.5"
-                    title="Samuel V. (Admin) - Conectado"
+                    title="Samuel V. (Admin) - Conectado y Autorizado"
                   >
                     SV
                     <span className="absolute -bottom-0.5 -right-0.5 block h-2 w-2 rounded-full ring-2 ring-white bg-emerald-500 animate-pulse" />
                   </div>
-                  <div 
-                    className="inline-block h-7 w-7 rounded-full ring-2 ring-indigo-100 bg-indigo-500 text-white text-[9.5px] font-extrabold flex items-center justify-center relative cursor-help transition-all duration-200 hover:scale-105 hover:-translate-y-0.5"
-                    title="Carlos Gómez (Equipo Diseño) - Conectado"
-                  >
-                    CG
-                    <span className="absolute -bottom-0.5 -right-0.5 block h-2 w-2 rounded-full ring-2 ring-white bg-emerald-500 animate-pulse" />
-                  </div>
-                  <div 
-                    className="inline-block h-7 w-7 rounded-full ring-2 ring-emerald-100 bg-emerald-500 text-white text-[9.5px] font-extrabold flex items-center justify-center relative cursor-help transition-all duration-200 hover:scale-105 hover:-translate-y-0.5"
-                    title="Sofía Pasquel (Gerente Cliente) - Conectada"
-                  >
-                    SP
-                    <span className="absolute -bottom-0.5 -right-0.5 block h-2 w-2 rounded-full ring-2 ring-white bg-emerald-500 animate-pulse" />
-                  </div>
+
+                  {/* Carlos Gómez (Equipo) */}
+                  {(() => {
+                    const req = accessRequests.find(r => r.role === 'Equipo');
+                    const status = req ? req.status : 'pending';
+                    if (status !== 'approved') return null;
+                    
+                    return (
+                      <div 
+                        className="inline-block h-7 w-7 rounded-full ring-2 ring-indigo-100 bg-indigo-500 text-white text-[9.5px] font-extrabold flex items-center justify-center relative cursor-help transition-all duration-200 hover:scale-105 hover:-translate-y-0.5"
+                        title="Carlos Gómez (Equipo) - Conectado y Autorizado"
+                      >
+                        CG
+                        <span className="absolute -bottom-0.5 -right-0.5 block h-2 w-2 rounded-full ring-2 ring-white bg-emerald-500 animate-pulse" />
+                      </div>
+                    );
+                  })()}
+
+                  {/* Sofía Pasquel (Cliente) */}
+                  {(() => {
+                    const req = accessRequests.find(r => r.role === 'Cliente');
+                    const status = req ? req.status : 'pending';
+                    if (status !== 'approved') return null;
+                    
+                    return (
+                      <div 
+                        className="inline-block h-7 w-7 rounded-full ring-2 ring-emerald-100 bg-emerald-500 text-white text-[9.5px] font-extrabold flex items-center justify-center relative cursor-help transition-all duration-200 hover:scale-105 hover:-translate-y-0.5"
+                        title="Sofía Pasquel (Cliente) - Conectada y Autorizada"
+                      >
+                        SP
+                        <span className="absolute -bottom-0.5 -right-0.5 block h-2 w-2 rounded-full ring-2 ring-white bg-emerald-500 animate-pulse" />
+                      </div>
+                    );
+                  })()}
                 </div>
+
+                {/* Texto de Estado Dinámico */}
                 <div className="text-left flex items-center border-l border-slate-200/80 pl-2.5">
-                  <span className="text-[9px] text-emerald-600 font-extrabold flex items-center gap-1.5 tracking-wider uppercase">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                    3 ACTIVOS
-                  </span>
+                  {(() => {
+                    const eqReq = accessRequests.find(r => r.role === 'Equipo');
+                    const clReq = accessRequests.find(r => r.role === 'Cliente');
+                    const eqStatus = eqReq ? eqReq.status : 'pending';
+                    const clStatus = clReq ? clReq.status : 'pending';
+                    
+                    const approvedCount = 1 + (eqStatus === 'approved' ? 1 : 0) + (clStatus === 'approved' ? 1 : 0);
+                    
+                    return (
+                      <span className="text-[9px] text-emerald-600 font-extrabold flex items-center gap-1.5 tracking-wider uppercase">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                        {approvedCount} {approvedCount === 1 ? 'ACTIVO' : 'ACTIVOS'}
+                      </span>
+                    );
+                  })()}
                 </div>
               </div>
 
@@ -633,40 +909,106 @@ export default function App() {
 
         {/* Layout Dashboard */}
         <main className="flex-1 p-4 sm:p-6 space-y-6">
-          
-          {/* Active Role Quick Banner info for external links */}
-          {activeUserRole !== 'Admin' && (
-            <div className={`p-3.5 rounded-2xl border ${
-              activeUserRole === 'Cliente' 
-                ? 'bg-emerald-50 text-emerald-800 border-emerald-200' 
-                : 'bg-indigo-50 text-indigo-800 border-indigo-200'
-            } flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs font-semibold`}>
-              <div className="flex items-center gap-2">
-                {activeUserRole === 'Cliente' ? (
-                  <span className="p-1 bg-emerald-100 rounded-lg text-emerald-700">💼</span>
-                ) : (
-                  <span className="p-1 bg-indigo-100 rounded-lg text-indigo-700">👥</span>
-                )}
+
+          {/* Alertas de Solicitudes de Acceso Pendientes (Solo para el Admin) */}
+          {activeUserRole === 'Admin' && accessRequests.some(r => r.status === 'pending') && (
+            <div className="bg-amber-50/95 border border-amber-250 rounded-2xl p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 text-xs shadow-xs">
+              <div className="flex items-center gap-3">
+                <span className="p-2.5 bg-amber-100 rounded-xl text-amber-700">
+                  <Radio className="w-4 h-4 animate-pulse text-amber-600" />
+                </span>
                 <div>
-                  <p>Has accedido a través del link de compartición en tiempo real como <strong className="underline">{activeUserName}</strong>.</p>
-                  <p className="text-[10px] text-slate-400 font-medium mt-0.5">
-                    {activeUserRole === 'Cliente' 
-                      ? 'Como Gerente de la empresa cliente puedes auditar avances, marcar entregables completados y dejar comentarios de feedback.' 
-                      : 'Como miembro del equipo de iGenius Solutions puedes editar, completar y colaborar.'}
+                  <h4 className="font-extrabold text-slate-900 text-sm">Solicitud de Acceso Co-Editor</h4>
+                  <p className="text-slate-500 mt-0.5">
+                    Hay usuarios conectados solicitando permiso de acceso para visualizar y editar este cronograma.
                   </p>
                 </div>
               </div>
-              <button 
-                onClick={() => {
-                  setActiveUserRole('Admin');
-                  setActiveUserName('Samuel V. (iGenius)');
-                }}
-                className="px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-700 hover:bg-slate-100 transition-colors text-[10px] font-bold"
-              >
-                Volver a Modo Admin
-              </button>
+              <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+                {accessRequests.filter(r => r.status === 'pending').map((req) => (
+                  <div key={req.id} className="bg-white border border-amber-200 rounded-xl py-1.5 px-3 flex items-center gap-3 shadow-2xs">
+                    <span className="font-bold text-slate-800 text-[11px]">
+                      {req.name} <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-extrabold uppercase">{req.role}</span>
+                    </span>
+                    <div className="flex gap-1.5">
+                      <button
+                        onClick={() => {
+                          setAccessRequests(prev => prev.map(r => r.id === req.id ? { ...r, status: 'approved' } : r));
+                        }}
+                        className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-lg text-[10px] cursor-pointer"
+                      >
+                        Aprobar
+                      </button>
+                      <button
+                        onClick={() => {
+                          setAccessRequests(prev => prev.map(r => r.id === req.id ? { ...r, status: 'rejected' } : r));
+                        }}
+                        className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg text-[10px] cursor-pointer"
+                      >
+                        Rechazar
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
+          
+          {/* Active Role Quick Banner info for external links */}
+          {activeUserRole !== 'Admin' && (() => {
+            const isApproved = activeUserRole === 'Admin' || (currentRequest && currentRequest.status === 'approved');
+            return (
+              <div className={`p-4 rounded-2xl border ${
+                !isApproved 
+                  ? 'bg-amber-50/80 text-amber-900 border-amber-200' 
+                  : (activeUserRole === 'Cliente' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-indigo-50 text-indigo-800 border-indigo-200')
+              } flex flex-col md:flex-row items-start md:items-center justify-between gap-4 text-xs font-semibold shadow-xs`}>
+                <div className="flex items-start md:items-center gap-3">
+                  {!isApproved ? (
+                    <span className="p-2 bg-amber-100 rounded-xl text-amber-700 animate-pulse">🔒</span>
+                  ) : activeUserRole === 'Cliente' ? (
+                    <span className="p-2 bg-emerald-100 rounded-xl text-emerald-700">💼</span>
+                  ) : (
+                    <span className="p-2 bg-indigo-100 rounded-xl text-indigo-700">👥</span>
+                  )}
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p>Has accedido como co-editor con el rol <strong className="underline">{activeUserName}</strong>.</p>
+                      {!isApproved ? (
+                        <span className="bg-amber-100 text-amber-800 px-2 py-0.5 rounded-md text-[9px] font-black uppercase border border-amber-200 tracking-wider flex items-center gap-1">
+                          <span className="w-1 h-1 bg-amber-500 rounded-full animate-ping" />
+                          Esperando Aprobación
+                        </span>
+                      ) : (
+                        <span className="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-md text-[9px] font-black uppercase border border-emerald-200 tracking-wider flex items-center gap-1">
+                          <span className="w-1 h-1 bg-emerald-500 rounded-full animate-ping" />
+                          Acceso Autorizado y Activo
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[10px] text-slate-500 font-medium mt-1">
+                      {!isApproved 
+                        ? 'Tu acceso de co-editor está en espera de aprobación por el Administrador. Tienes permisos de visualización completos del cronograma.' 
+                        : (activeUserRole === 'Cliente' 
+                          ? 'Como Gerente Cliente puedes marcar hitos completados y dejar comentarios de feedback en tiempo real.' 
+                          : 'Como miembro del Equipo Técnico puedes crear, modificar y estructurar el cronograma completo.')}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 self-stretch md:self-auto justify-end">
+                  <button 
+                    onClick={() => {
+                      setActiveUserRole('Admin');
+                      setActiveUserName('Samuel V. (iGenius)');
+                    }}
+                    className="px-3 py-1.5 bg-white border border-slate-200 hover:border-slate-300 rounded-xl text-slate-700 hover:bg-slate-100 transition-all text-[10px] font-extrabold shadow-2xs cursor-pointer flex-shrink-0"
+                  >
+                    Volver a Modo Admin
+                  </button>
+                </div>
+              </div>
+            );
+          })()}
 
           {/* --- VIEW ROUTER --- */}
           {activeTab === 'colaboracion' ? (
@@ -762,6 +1104,35 @@ export default function App() {
                       <p className="text-xs text-slate-400 font-medium leading-relaxed mt-1">
                         Habilita la edición de entregables, checklist de avance y comentarios directos para diseñadores, redactores y media buyers.
                       </p>
+
+                      {(() => {
+                        const req = accessRequests.find(r => r.role === 'Equipo');
+                        if (!req) return null;
+                        return (
+                          <div className="p-2 bg-slate-50 border border-slate-150 rounded-xl flex items-center justify-between text-[11px] font-semibold mt-2.5">
+                            <span className="text-slate-500 text-[10px]">Acceso:</span>
+                            <div className="flex items-center gap-1.5">
+                              <span className={`px-2 py-0.5 text-[8.5px] font-black uppercase rounded-full border ${
+                                req.status === 'approved' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' :
+                                req.status === 'pending' ? 'bg-amber-50 text-amber-700 border-amber-100' :
+                                'bg-red-50 text-red-700 border-red-100'
+                              }`}>
+                                {req.status === 'approved' ? 'Aprobado' : req.status === 'pending' ? 'Pendiente' : 'Rechazado'}
+                              </span>
+                              {activeUserRole === 'Admin' && (
+                                <button
+                                  onClick={() => {
+                                    setAccessRequests(prev => prev.map(r => r.role === 'Equipo' ? { ...r, status: r.status === 'approved' ? 'rejected' : 'approved' } : r));
+                                  }}
+                                  className="text-[9px] text-blue-600 hover:underline cursor-pointer font-black"
+                                >
+                                  {req.status === 'approved' ? 'Revocar' : 'Aprobar'}
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </div>
                   </div>
                   <div className="flex flex-col gap-2">
@@ -807,6 +1178,35 @@ export default function App() {
                       <p className="text-xs text-slate-400 font-medium leading-relaxed mt-1">
                         Ideal para el cliente. Bloquea campos críticos de planificación para que actúe como auditor directo y de feedback.
                       </p>
+
+                      {(() => {
+                        const req = accessRequests.find(r => r.role === 'Cliente');
+                        if (!req) return null;
+                        return (
+                          <div className="p-2 bg-slate-50 border border-slate-150 rounded-xl flex items-center justify-between text-[11px] font-semibold mt-2.5">
+                            <span className="text-slate-500 text-[10px]">Acceso:</span>
+                            <div className="flex items-center gap-1.5">
+                              <span className={`px-2 py-0.5 text-[8.5px] font-black uppercase rounded-full border ${
+                                req.status === 'approved' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' :
+                                req.status === 'pending' ? 'bg-amber-50 text-amber-700 border-amber-100' :
+                                'bg-red-50 text-red-700 border-red-100'
+                              }`}>
+                                {req.status === 'approved' ? 'Aprobado' : req.status === 'pending' ? 'Pendiente' : 'Rechazado'}
+                              </span>
+                              {activeUserRole === 'Admin' && (
+                                <button
+                                  onClick={() => {
+                                    setAccessRequests(prev => prev.map(r => r.role === 'Cliente' ? { ...r, status: r.status === 'approved' ? 'rejected' : 'approved' } : r));
+                                  }}
+                                  className="text-[9px] text-blue-600 hover:underline cursor-pointer font-black"
+                                >
+                                  {req.status === 'approved' ? 'Revocar' : 'Aprobar'}
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </div>
                   </div>
                   <div className="flex flex-col gap-2">
@@ -1366,6 +1766,7 @@ export default function App() {
         defaultDate={taskDefaultDate}
         activeUserRole={activeUserRole}
         activeUserName={activeUserName}
+        isApproved={hasAccess}
       />
 
       <ReportModal

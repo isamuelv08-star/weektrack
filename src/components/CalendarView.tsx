@@ -33,9 +33,8 @@ export default function CalendarView({
   selectedStatus,
   selectedPriority,
 }: CalendarViewProps) {
-  // Inicializar en la fecha actual (Julio de 2026 en este caso)
-  const systemDate = new Date('2026-07-13T12:00:00');
-  const [currentDate, setCurrentDate] = useState<Date>(systemDate);
+  // Inicializar en la fecha actual del sistema
+  const [currentDate, setCurrentDate] = useState<Date>(() => new Date());
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
@@ -62,7 +61,7 @@ export default function CalendarView({
   };
 
   const handleGoToToday = () => {
-    setCurrentDate(new Date('2026-07-13T12:00:00'));
+    setCurrentDate(new Date());
   };
 
   // Lógica de cuadrícula de calendario
@@ -108,7 +107,11 @@ export default function CalendarView({
   };
 
   const isToday = (dateStr: string) => {
-    return dateStr === '2026-07-13'; // Resaltamos explícitamente el día de hoy según la hora del sistema
+    const today = new Date();
+    const y = today.getFullYear();
+    const m = String(today.getMonth() + 1).padStart(2, '0');
+    const d = String(today.getDate()).padStart(2, '0');
+    return dateStr === `${y}-${m}-${d}`;
   };
 
   return (

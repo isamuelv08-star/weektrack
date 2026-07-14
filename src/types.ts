@@ -38,3 +38,12 @@ export interface Task {
   progress: number; // 0 to 100
   comments?: Comment[];
 }
+
+export interface AccessRequest {
+  id: string;
+  role: 'Admin' | 'Equipo' | 'Cliente';
+  name: string;
+  status: 'pending' | 'approved' | 'rejected';
+  timestamp: string;
+}
+
