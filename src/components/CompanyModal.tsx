@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { Company } from '../types';
 import { X, Plus, Trash2, Edit2, Check, Archive, Share2, Shield, Eye, Settings } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { useFeedback } from './FeedbackProvider';
+
 
 interface CompanyModalProps {
   isOpen: boolean;
@@ -41,6 +43,7 @@ export default function CompanyModal({
   onUpdateCompany,
   onDeleteCompany,
 }: CompanyModalProps) {
+  const { showConfirm, showToast } = useFeedback();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [name, setName] = useState('');
   const [color, setColor] = useState(COLORS_PRESET[0]);
@@ -99,6 +102,7 @@ export default function CompanyModal({
           status,
           ...accessData,
         });
+        showToast('¡Cliente actualizado con éxito!', 'success');
       }
     } else {
       onAddCompany({
@@ -108,6 +112,7 @@ export default function CompanyModal({
         status,
         ...accessData,
       });
+      showToast('¡Cliente creado con éxito!', 'success');
     }
     resetForm();
   };
@@ -459,9 +464,17 @@ export default function CompanyModal({
                           </button>
                           <button
                             onClick={() => {
-                              if (confirm(`¿Estás seguro de que deseas eliminar a ${c.name}? Esto desvinculará permanentemente todas sus tareas y registros.`)) {
-                                onDeleteCompany(c.id);
-                              }
+                              showConfirm({
+                                title: '¿Eliminar cliente?',
+                                message: `¿Estás seguro de que deseas eliminar a ${c.name}? Esto desvinculará permanentemente todas sus tareas y registros.`,
+                                confirmText: 'Sí, eliminar',
+                                cancelText: 'Cancelar',
+                                type: 'danger',
+                                onConfirm: () => {
+                                  onDeleteCompany(c.id);
+                                  showToast('¡Cliente eliminado con éxito!', 'success');
+                                }
+                              });
                             }}
                             title="Eliminar cliente"
                             className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all cursor-pointer border border-slate-100"

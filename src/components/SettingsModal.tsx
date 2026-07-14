@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { X, Settings, Shield, Bell, Database, Check, Palette, Mail, Lock, Globe } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { supabase, isSupabaseConfigured } from '../supabase';
+import { useFeedback } from './FeedbackProvider';
+
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -38,6 +40,7 @@ export default function SettingsModal({
   activeUserEmail,
   onUpdateEmail,
 }: SettingsModalProps) {
+  const { showConfirm, showToast } = useFeedback();
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
   const [newEmail, setNewEmail] = useState(activeUserEmail);
@@ -114,14 +117,18 @@ export default function SettingsModal({
   };
 
   const handleReset = () => {
-    if (confirm('⚠️ ¿Estás completamente seguro de restablecer el sistema? Esto eliminará todos los entregables, clientes personalizados y comentarios cargados, volviendo a la simulación inicial.')) {
-      onResetData();
-      setSuccessMsg('¡Datos restablecidos con éxito!');
-      setTimeout(() => {
-        setSuccessMsg(null);
+    showConfirm({
+      title: '¿Restablecer el sistema?',
+      message: '⚠️ ¿Estás completamente seguro de restablecer el sistema? Esto eliminará todos los entregables, clientes personalizados y comentarios cargados, volviendo a la simulación inicial.',
+      confirmText: 'Sí, restablecer',
+      cancelText: 'Cancelar',
+      type: 'danger',
+      onConfirm: () => {
+        onResetData();
+        showToast('¡Datos restablecidos con éxito!', 'success');
         onClose();
-      }, 1500);
-    }
+      }
+    });
   };
 
   if (!isOpen) return null;

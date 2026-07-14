@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Task, Company, TaskType, TaskStatus, TaskPriority, SubTask, Comment } from '../types';
 import { X, Plus, Trash2, Copy, CheckSquare, Calendar, AlertTriangle, Layers, AlignLeft, MessageSquare, Send } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { useFeedback } from './FeedbackProvider';
+
 
 interface TaskModalProps {
   isOpen: boolean;
@@ -50,6 +52,7 @@ export default function TaskModal({
   activeUserName,
   isApproved = true,
 }: TaskModalProps) {
+  const { showConfirm, showToast } = useFeedback();
   const [companyId, setCompanyId] = useState('');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -670,10 +673,17 @@ export default function TaskModal({
                     id="delete-task-btn"
                     type="button"
                     onClick={() => {
-                      if (confirm('¿Estás seguro de que deseas eliminar esta tarea?')) {
-                        onDeleteTask(task.id);
-                        onClose();
-                      }
+                      showConfirm({
+                        title: '¿Eliminar tarea?',
+                        message: '¿Estás seguro de que deseas eliminar esta tarea permanentemente?',
+                        confirmText: 'Sí, eliminar',
+                        cancelText: 'Cancelar',
+                        type: 'danger',
+                        onConfirm: () => {
+                          onDeleteTask(task.id);
+                          onClose();
+                        }
+                      });
                     }}
                     className="px-4 py-2 bg-rose-50 text-rose-600 hover:bg-rose-100 hover:text-rose-700 font-semibold rounded-xl text-xs transition-colors cursor-pointer"
                   >

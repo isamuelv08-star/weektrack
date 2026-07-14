@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Company, Task, TaskStatus, TaskPriority, TaskType, AccessRequest } from './types';
 import { INITIAL_COMPANIES, INITIAL_TASKS } from './initialData';
+import { useFeedback } from './components/FeedbackProvider';
 
 // Modales
 import CompanyModal from './components/CompanyModal';
@@ -57,6 +58,8 @@ import { motion } from 'motion/react';
 import { supabase, isSupabaseConfigured } from './supabase';
 
 export default function App() {
+  const { showToast, showConfirm, showAlert } = useFeedback();
+
   // --- ESTADO PRINCIPAL ---
   const [companies, setCompanies] = useState<Company[]>(() => {
     const local = localStorage.getItem('cronograma_companies');
@@ -270,6 +273,7 @@ export default function App() {
     const link = generateSharingLink(role, selectedCompanyId);
     navigator.clipboard.writeText(link);
     setCopiedLink(role + '_copied');
+    showToast(`¡Enlace para ${role === 'Admin' ? 'Administrador' : role === 'Equipo' ? 'Equipo' : 'Cliente'} copiado!`, 'success');
     setTimeout(() => setCopiedLink(false), 2500);
   };
 
@@ -277,6 +281,8 @@ export default function App() {
     const link = generateSharingLink(role, companyId);
     navigator.clipboard.writeText(link);
     setCopiedLink(`${role}_${companyId}_copied`);
+    const compName = companies.find(c => c.id === companyId)?.name || 'Cliente';
+    showToast(`¡Enlace para ${role} (${compName}) copiado!`, 'success');
     setTimeout(() => setCopiedLink(false), 2500);
   };
 
@@ -608,14 +614,16 @@ export default function App() {
   const handleSaveTask = (savedTask: Task) => {
     const isApproved = activeUserRole === 'Admin' || (currentRequest && currentRequest.status === 'approved');
     if (!isApproved) {
-      alert("Tu solicitud de acceso como co-editor aún no ha sido aprobada por el Administrador. Tienes acceso de solo lectura.");
+      showAlert("Acceso de solo lectura", "Tu solicitud de acceso como co-editor aún no ha sido aprobada por el Administrador. Tienes acceso de solo lectura.", "warning");
       return;
     }
     const exists = tasks.some((t) => t.id === savedTask.id);
     if (exists) {
       setTasks(tasks.map((t) => (t.id === savedTask.id ? savedTask : t)));
+      showToast("¡Tarea actualizada con éxito!", "success");
     } else {
       setTasks([...tasks, savedTask]);
+      showToast("¡Tarea creada con éxito!", "success");
     }
   };
 
@@ -623,10 +631,11 @@ export default function App() {
   const handleDeleteTask = (id: string) => {
     const isApproved = activeUserRole === 'Admin' || (currentRequest && currentRequest.status === 'approved');
     if (!isApproved) {
-      alert("Tu solicitud de acceso como co-editor aún no ha sido aprobada por el Administrador.");
+      showAlert("Acceso restringido", "Tu solicitud de acceso como co-editor aún no ha sido aprobada por el Administrador.", "error");
       return;
     }
     setTasks(tasks.filter((t) => t.id !== id));
+    showToast("¡Tarea eliminada con éxito!", "success");
   };
 
   // Duplicar Tarea (Útil para tareas recurrentes)
@@ -652,7 +661,7 @@ export default function App() {
   const handleUpdateTaskStatus = (id: string, newStatus: TaskStatus) => {
     const isApproved = activeUserRole === 'Admin' || (currentRequest && currentRequest.status === 'approved');
     if (!isApproved) {
-      alert("Tu solicitud de acceso como co-editor aún no ha sido aprobada por el Administrador. Tienes acceso de solo lectura.");
+      showAlert("Acceso de solo lectura", "Tu solicitud de acceso como co-editor aún no ha sido aprobada por el Administrador. Tienes acceso de solo lectura.", "warning");
       return;
     }
     setTasks(
