@@ -1,0 +1,6 @@
+{
+  "name": "WeekTrack",
+  "description": "Herramienta de planificación y gestión de trabajo mensual para múltiples clientes con calendario, Kanban, roadmap, timeline y sincronización de comentarios en tiempo real.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
