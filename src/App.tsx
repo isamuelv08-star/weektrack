@@ -54,6 +54,7 @@ import {
   Radio,
 } from 'lucide-react';
 import { motion } from 'motion/react';
+import { supabase, isSupabaseConfigured } from './supabase';
 
 export default function App() {
   // --- ESTADO PRINCIPAL ---
@@ -107,7 +108,37 @@ export default function App() {
 
   // --- FILTROS Y NAVEGACIÓN ---
   const [activeTab, setActiveTab] = useState<'calendario' | 'kanban' | 'roadmap' | 'timeline' | 'colaboracion'>('calendario');
-  const [selectedCompanyId, setSelectedCompanyId] = useState<string>('all');
+  const [restrictedCompanyId, setRestrictedCompanyId] = useState<string | null>(() => {
+    const params = new URLSearchParams(window.location.search);
+    const roleParam = params.get('role');
+    const companyParam = params.get('company');
+    const sessionRole = sessionStorage.getItem('wt_current_user_role') || roleParam;
+    
+    if (sessionRole === 'admin' || sessionRole === 'Admin') {
+      return null;
+    }
+    if (companyParam) {
+      sessionStorage.setItem('wt_restricted_company_id', companyParam);
+      return companyParam;
+    }
+    return sessionStorage.getItem('wt_restricted_company_id') || null;
+  });
+
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string>(() => {
+    const params = new URLSearchParams(window.location.search);
+    const roleParam = params.get('role');
+    const companyParam = params.get('company');
+    const sessionRole = sessionStorage.getItem('wt_current_user_role') || roleParam;
+    
+    if (sessionRole === 'admin' || sessionRole === 'Admin') {
+      return 'all';
+    }
+    if (companyParam) {
+      return companyParam;
+    }
+    return sessionStorage.getItem('wt_restricted_company_id') || 'all';
+  });
+
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedType, setSelectedType] = useState<string>('all');
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
@@ -157,6 +188,15 @@ export default function App() {
     if (activeUserRole === 'Cliente') return 'Sofía Pasquel (Gerente)';
     if (activeUserRole === 'Equipo') return 'Carlos Gómez (Diseño)';
     return 'Samuel V. (iGenius)';
+  });
+
+  const [activeUserEmail, setActiveUserEmail] = useState<string>(() => {
+    const sessionEmail = sessionStorage.getItem('wt_current_user_email');
+    if (sessionEmail) return sessionEmail;
+
+    if (activeUserRole === 'Cliente') return 'sofia@mundillantas.com';
+    if (activeUserRole === 'Equipo') return 'carlos@igenius.com';
+    return 'samuel@igenius.com';
   });
 
   const [accessRequests, setAccessRequests] = useState<AccessRequest[]>(() => {
@@ -268,6 +308,15 @@ export default function App() {
     return () => clearInterval(interval);
   }, [companies]);
 
+  // Forzar que el filtro de compañía esté bloqueado al ID restringido si el usuario no es Administrador
+  useEffect(() => {
+    if (activeUserRole !== 'Admin' && restrictedCompanyId) {
+      if (selectedCompanyId !== restrictedCompanyId) {
+        setSelectedCompanyId(restrictedCompanyId);
+      }
+    }
+  }, [activeUserRole, restrictedCompanyId, selectedCompanyId]);
+
   // Generar URL de compartición con roles y parámetros
   const generateSharingLink = (role: 'Admin' | 'Equipo' | 'Cliente', companyId?: string) => {
     const baseUrl = window.location.origin + window.location.pathname;
@@ -276,7 +325,7 @@ export default function App() {
     if (role === 'Admin') name = 'Samuel V.';
     
     let url = `${baseUrl}?role=${role.toLowerCase()}&name=${encodeURIComponent(name)}`;
-    if (role === 'Cliente' && companyId && companyId !== 'all') {
+    if (role !== 'Admin' && companyId && companyId !== 'all') {
       url += `&company=${companyId}`;
     }
     return url;
@@ -286,6 +335,13 @@ export default function App() {
     const link = generateSharingLink(role, selectedCompanyId);
     navigator.clipboard.writeText(link);
     setCopiedLink(role + '_copied');
+    setTimeout(() => setCopiedLink(false), 2500);
+  };
+
+  const handleCopyLinkForCompany = (role: 'Admin' | 'Equipo' | 'Cliente', companyId: string) => {
+    const link = generateSharingLink(role, companyId);
+    navigator.clipboard.writeText(link);
+    setCopiedLink(`${role}_${companyId}_copied`);
     setTimeout(() => setCopiedLink(false), 2500);
   };
 
@@ -372,14 +428,71 @@ export default function App() {
     };
   }, []);
 
+  // Escuchar estado de autenticación de Supabase para mantener la sesión iniciada
+  useEffect(() => {
+    if (!isSupabaseConfigured || !supabase) return;
+
+    // Obtener sesión inicial
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session && session.user) {
+        const user = session.user;
+        const meta = user.user_metadata || {};
+        const role = (meta.role as 'Admin' | 'Equipo' | 'Cliente') || 'Admin';
+        const name = meta.name || user.email?.split('@')[0] || 'Usuario';
+        
+        setActiveUserRole(role);
+        setActiveUserName(name);
+        setActiveUserEmail(user.email || '');
+        setIsAuthenticated(true);
+        sessionStorage.setItem('wt_authenticated', 'true');
+        sessionStorage.setItem('wt_current_user_name', name);
+        sessionStorage.setItem('wt_current_user_role', role);
+        sessionStorage.setItem('wt_current_user_email', user.email || '');
+      }
+    });
+
+    // Escuchar cambios
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN' && session?.user) {
+        const user = session.user;
+        const meta = user.user_metadata || {};
+        const role = (meta.role as 'Admin' | 'Equipo' | 'Cliente') || 'Admin';
+        const name = meta.name || user.email?.split('@')[0] || 'Usuario';
+        
+        setActiveUserRole(role);
+        setActiveUserName(name);
+        setActiveUserEmail(user.email || '');
+        setIsAuthenticated(true);
+        sessionStorage.setItem('wt_authenticated', 'true');
+        sessionStorage.setItem('wt_current_user_name', name);
+        sessionStorage.setItem('wt_current_user_role', role);
+        sessionStorage.setItem('wt_current_user_email', user.email || '');
+      } else if (event === 'SIGNED_OUT') {
+        setIsAuthenticated(false);
+        sessionStorage.removeItem('wt_authenticated');
+        sessionStorage.removeItem('wt_current_user_name');
+        sessionStorage.removeItem('wt_current_user_role');
+        sessionStorage.removeItem('wt_current_user_email');
+        sessionStorage.removeItem('wt_restricted_company_id');
+        setRestrictedCompanyId(null);
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
   // Handlers de Sesión y Control de Accesos
-  const handleLogin = (role: 'Admin' | 'Equipo' | 'Cliente', name: string) => {
+  const handleLogin = (role: 'Admin' | 'Equipo' | 'Cliente', name: string, email: string) => {
     sessionStorage.setItem('wt_authenticated', 'true');
     sessionStorage.setItem('wt_current_user_name', name);
     sessionStorage.setItem('wt_current_user_role', role);
+    sessionStorage.setItem('wt_current_user_email', email);
     
     setActiveUserRole(role);
     setActiveUserName(name);
+    setActiveUserEmail(email);
     setIsAuthenticated(true);
 
     // Asegurar que exista una solicitud si no es Admin
@@ -403,10 +516,16 @@ export default function App() {
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    if (isSupabaseConfigured && supabase) {
+      await supabase.auth.signOut();
+    }
     sessionStorage.removeItem('wt_authenticated');
     sessionStorage.removeItem('wt_current_user_name');
     sessionStorage.removeItem('wt_current_user_role');
+    sessionStorage.removeItem('wt_current_user_email');
+    sessionStorage.removeItem('wt_restricted_company_id');
+    setRestrictedCompanyId(null);
     
     // Limpiar params de URL para evitar re-logueos indeseados
     const baseUrl = window.location.origin + window.location.pathname;
@@ -588,6 +707,13 @@ export default function App() {
     setSelectedPriority('all');
   };
 
+  // Selector de empresas visibles (filtramos de forma estricta para no-administradores)
+  const visibleCompanies = activeUserRole === 'Admin' || !restrictedCompanyId
+    ? companies
+    : companies.filter((c) => c.id === restrictedCompanyId);
+
+  const restrictedCompanyNotFound = isAuthenticated && activeUserRole !== 'Admin' && restrictedCompanyId && !companies.some(c => c.id === restrictedCompanyId);
+
   // --- CÁLCULO DE MÉTRICAS GLOBALES ---
   // Filtrar según el selector global superior de cliente
   const clientFilteredTasks = tasks.filter(
@@ -627,6 +753,29 @@ export default function App() {
 
   if (!isAuthenticated) {
     return <Login onLogin={handleLogin} />;
+  }
+
+  if (restrictedCompanyNotFound) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 text-center select-none font-sans">
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-red-600/5 rounded-full blur-3xl pointer-events-none" />
+        <div className="w-full max-w-md bg-slate-900/80 border border-slate-800 rounded-3xl p-8 shadow-2xl relative z-10">
+          <div className="w-16 h-16 bg-red-950 border border-red-900/50 rounded-2xl flex items-center justify-center text-red-500 mx-auto mb-6">
+            <AlertTriangle className="w-8 h-8" />
+          </div>
+          <h2 className="text-xl font-black text-white mb-2">Espacio de Trabajo No Encontrado</h2>
+          <p className="text-sm text-slate-400 mb-6 leading-relaxed">
+            El enlace de acceso utilizado pertenece a una empresa que ha sido eliminada de la plataforma o es inactiva. Comunícate con el Administrador para solicitar un nuevo enlace de invitación.
+          </p>
+          <button
+            onClick={handleLogout}
+            className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm font-bold rounded-2xl transition-all cursor-pointer border border-slate-700/55"
+          >
+            Volver al Inicio
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -869,26 +1018,35 @@ export default function App() {
                 <span className="text-xs font-bold text-slate-700">
                   {activeUserRole === 'Admin' ? 'Líder Sistema' : activeUserRole === 'Equipo' ? 'Equipo Técnico' : 'Gerente Cliente'}
                 </span>
-                <span className="text-[10px] text-slate-400">• {activeUserName}</span>
+                <span className="text-[10px] text-slate-400">• {activeUserName} ({activeUserEmail})</span>
               </div>
 
               {/* Selector de Clientes Global en Cabecera */}
-              <div className="flex items-center bg-slate-100 border border-slate-200 rounded-xl px-3 py-1.5 gap-2">
-                <Users className="w-3.5 h-3.5 text-slate-500" />
-                <select
-                  id="global-company-filter"
-                  value={selectedCompanyId}
-                  onChange={(e) => setSelectedCompanyId(e.target.value)}
-                  className="bg-transparent text-xs font-bold text-slate-700 outline-none cursor-pointer min-w-[140px]"
-                >
-                  <option value="all">Todos los Clientes</option>
-                  {companies.filter(c => c.status === 'activa').map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {activeUserRole === 'Admin' ? (
+                <div className="flex items-center bg-slate-100 border border-slate-200 rounded-xl px-3 py-1.5 gap-2">
+                  <Users className="w-3.5 h-3.5 text-slate-500" />
+                  <select
+                    id="global-company-filter"
+                    value={selectedCompanyId}
+                    onChange={(e) => setSelectedCompanyId(e.target.value)}
+                    className="bg-transparent text-xs font-bold text-slate-700 outline-none cursor-pointer min-w-[140px]"
+                  >
+                    <option value="all">Todos los Clientes</option>
+                    {companies.filter(c => c.status === 'activa').map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ) : (
+                <div className="flex items-center bg-slate-100 border border-slate-200 rounded-xl px-3 py-1.5 gap-2">
+                  <Users className="w-3.5 h-3.5 text-slate-500" />
+                  <span className="text-xs font-bold text-slate-700">
+                    Cliente: {companies.find(c => c.id === selectedCompanyId)?.name || 'Cargando...'}
+                  </span>
+                </div>
+              )}
 
               {/* Crear Tarea */}
               {activeUserRole !== 'Cliente' && (
@@ -1135,25 +1293,64 @@ export default function App() {
                       })()}
                     </div>
                   </div>
-                  <div className="flex flex-col gap-2">
-                    <button
-                      onClick={() => handleCopyLink('Equipo')}
-                      className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-                    >
-                      {copiedLink === 'Equipo_copied' ? (
-                        <>
-                          <Check className="w-4 h-4 text-emerald-400" /> ¡Copiado de Equipo!
-                        </>
+
+                  <div className="space-y-3">
+                    {/* Botones de copiado de link por empresa */}
+                    <div>
+                      {selectedCompanyId !== 'all' ? (
+                        <div className="bg-slate-50 border border-slate-100 p-2.5 rounded-xl">
+                          <span className="text-[10px] text-slate-400 font-bold block mb-1">Empresa seleccionada:</span>
+                          <span className="text-xs font-extrabold text-slate-700 block mb-2">{companies.find(c => c.id === selectedCompanyId)?.name}</span>
+                          <button
+                            onClick={() => handleCopyLinkForCompany('Equipo', selectedCompanyId)}
+                            className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                          >
+                            {copiedLink === `Equipo_${selectedCompanyId}_copied` ? (
+                              <>
+                                <Check className="w-4 h-4 text-emerald-400" /> ¡Enlace Copiado!
+                              </>
+                            ) : (
+                              <>
+                                <Share2 className="w-3.5 h-3.5" /> Copiar Enlace Equipo
+                              </>
+                            )}
+                          </button>
+                        </div>
                       ) : (
-                        <>
-                          <Share2 className="w-3.5 h-3.5" /> Copiar Link Equipo
-                        </>
+                        <div className="border border-slate-150 rounded-xl overflow-hidden">
+                          <div className="bg-slate-50 border-b border-slate-150 py-1.5 px-2 text-center">
+                            <span className="text-[10px] text-slate-500 font-bold uppercase">Copiar Enlace por Empresa</span>
+                          </div>
+                          <div className="max-h-40 overflow-y-auto divide-y divide-slate-100 p-1 bg-white">
+                            {companies.filter(c => c.status === 'activa').map((comp) => (
+                              <div key={comp.id} className="flex items-center justify-between p-1.5 hover:bg-slate-50 transition-colors">
+                                <div className="flex items-center gap-1.5 min-w-0">
+                                  <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: comp.color }} />
+                                  <span className="text-[11px] font-bold text-slate-700 truncate">{comp.name}</span>
+                                </div>
+                                <button
+                                  onClick={() => handleCopyLinkForCompany('Equipo', comp.id)}
+                                  className="px-2 py-0.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold rounded-md text-[9px] transition-colors cursor-pointer shrink-0"
+                                >
+                                  {copiedLink === `Equipo_${comp.id}_copied` ? '¡Copiado!' : 'Copiar'}
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
                       )}
-                    </button>
+                    </div>
+
                     <button
                       onClick={() => {
+                        const targetCompId = selectedCompanyId !== 'all' ? selectedCompanyId : companies.filter(c => c.status === 'activa')[0]?.id;
                         setActiveUserRole('Equipo');
                         setActiveUserName('Carlos Gómez (Diseño)');
+                        if (targetCompId) {
+                          setSelectedCompanyId(targetCompId);
+                          setRestrictedCompanyId(targetCompId);
+                          sessionStorage.setItem('wt_restricted_company_id', targetCompId);
+                        }
                       }}
                       className={`w-full py-1.5 border rounded-xl text-[10px] font-bold transition-all cursor-pointer flex items-center justify-center gap-1 ${
                         activeUserRole === 'Equipo'
@@ -1209,25 +1406,64 @@ export default function App() {
                       })()}
                     </div>
                   </div>
-                  <div className="flex flex-col gap-2">
-                    <button
-                      onClick={() => handleCopyLink('Cliente')}
-                      className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-                    >
-                      {copiedLink === 'Cliente_copied' ? (
-                        <>
-                          <Check className="w-4 h-4 text-emerald-400" /> ¡Copiado de Cliente!
-                        </>
+
+                  <div className="space-y-3">
+                    {/* Botones de copiado de link por empresa */}
+                    <div>
+                      {selectedCompanyId !== 'all' ? (
+                        <div className="bg-slate-50 border border-slate-100 p-2.5 rounded-xl">
+                          <span className="text-[10px] text-slate-400 font-bold block mb-1">Empresa seleccionada:</span>
+                          <span className="text-xs font-extrabold text-slate-700 block mb-2">{companies.find(c => c.id === selectedCompanyId)?.name}</span>
+                          <button
+                            onClick={() => handleCopyLinkForCompany('Cliente', selectedCompanyId)}
+                            className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                          >
+                            {copiedLink === `Cliente_${selectedCompanyId}_copied` ? (
+                              <>
+                                <Check className="w-4 h-4 text-emerald-400" /> ¡Enlace Copiado!
+                              </>
+                            ) : (
+                              <>
+                                <Share2 className="w-3.5 h-3.5" /> Copiar Enlace Cliente
+                              </>
+                            )}
+                          </button>
+                        </div>
                       ) : (
-                        <>
-                          <Share2 className="w-3.5 h-3.5" /> Copiar Link de Cliente
-                        </>
+                        <div className="border border-slate-150 rounded-xl overflow-hidden">
+                          <div className="bg-slate-50 border-b border-slate-150 py-1.5 px-2 text-center">
+                            <span className="text-[10px] text-slate-500 font-bold uppercase">Copiar Enlace por Empresa</span>
+                          </div>
+                          <div className="max-h-40 overflow-y-auto divide-y divide-slate-100 p-1 bg-white">
+                            {companies.filter(c => c.status === 'activa').map((comp) => (
+                              <div key={comp.id} className="flex items-center justify-between p-1.5 hover:bg-slate-50 transition-colors">
+                                <div className="flex items-center gap-1.5 min-w-0">
+                                  <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: comp.color }} />
+                                  <span className="text-[11px] font-bold text-slate-700 truncate">{comp.name}</span>
+                                </div>
+                                <button
+                                  onClick={() => handleCopyLinkForCompany('Cliente', comp.id)}
+                                  className="px-2 py-0.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold rounded-md text-[9px] transition-colors cursor-pointer shrink-0"
+                                >
+                                  {copiedLink === `Cliente_${comp.id}_copied` ? '¡Copiado!' : 'Copiar'}
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
                       )}
-                    </button>
+                    </div>
+
                     <button
                       onClick={() => {
+                        const targetCompId = selectedCompanyId !== 'all' ? selectedCompanyId : companies.filter(c => c.status === 'activa')[0]?.id;
                         setActiveUserRole('Cliente');
                         setActiveUserName('Sofía Pasquel (Gerente)');
+                        if (targetCompId) {
+                          setSelectedCompanyId(targetCompId);
+                          setRestrictedCompanyId(targetCompId);
+                          sessionStorage.setItem('wt_restricted_company_id', targetCompId);
+                        }
                       }}
                       className={`w-full py-1.5 border rounded-xl text-[10px] font-bold transition-all cursor-pointer flex items-center justify-center gap-1 ${
                         activeUserRole === 'Cliente'
@@ -1672,7 +1908,7 @@ export default function App() {
                     {activeTab === 'calendario' && (
                       <CalendarView
                         tasks={tasks}
-                        companies={companies}
+                        companies={visibleCompanies}
                         onSelectTask={handleSelectTask}
                         onNewTaskWithDate={handleNewTask}
                         selectedCompanyId={selectedCompanyId}
@@ -1686,7 +1922,7 @@ export default function App() {
                     {activeTab === 'kanban' && (
                       <KanbanView
                         tasks={tasks}
-                        companies={companies}
+                        companies={visibleCompanies}
                         onSelectTask={handleSelectTask}
                         onUpdateTaskStatus={handleUpdateTaskStatus}
                         selectedCompanyId={selectedCompanyId}
@@ -1700,7 +1936,7 @@ export default function App() {
                     {activeTab === 'roadmap' && (
                       <RoadmapView
                         tasks={tasks}
-                        companies={companies}
+                        companies={visibleCompanies}
                         onSelectTask={handleSelectTask}
                         selectedCompanyId={selectedCompanyId}
                         searchQuery={searchQuery}
@@ -1713,7 +1949,7 @@ export default function App() {
                     {activeTab === 'timeline' && (
                       <TimelineView
                         tasks={tasks}
-                        companies={companies}
+                        companies={visibleCompanies}
                         onSelectTask={handleSelectTask}
                         selectedCompanyId={selectedCompanyId}
                         searchQuery={searchQuery}
@@ -1759,7 +1995,7 @@ export default function App() {
         isOpen={isTaskModalOpen}
         onClose={() => setIsTaskModalOpen(false)}
         task={selectedTask}
-        companies={companies}
+        companies={visibleCompanies}
         onSaveTask={handleSaveTask}
         onDeleteTask={handleDeleteTask}
         onDuplicateTask={handleDuplicateTask}
@@ -1773,7 +2009,7 @@ export default function App() {
         isOpen={isReportModalOpen}
         onClose={() => setIsReportModalOpen(false)}
         tasks={tasks}
-        companies={companies}
+        companies={visibleCompanies}
       />
 
       <SettingsModal
@@ -1786,6 +2022,11 @@ export default function App() {
         setDefaultPriority={setDefaultPriority}
         enableAlerts={enableAlerts}
         setEnableAlerts={setEnableAlerts}
+        activeUserEmail={activeUserEmail}
+        onUpdateEmail={(email) => {
+          setActiveUserEmail(email);
+          sessionStorage.setItem('wt_current_user_email', email);
+        }}
       />
 
     </div>

@@ -13,9 +13,10 @@ import {
   Loader2 
 } from 'lucide-react';
 import { motion } from 'motion/react';
+import { supabase, isSupabaseConfigured } from '../supabase';
 
 interface LoginProps {
-  onLogin: (role: 'Admin' | 'Equipo' | 'Cliente', name: string) => void;
+  onLogin: (role: 'Admin' | 'Equipo' | 'Cliente', name: string, email: string) => void;
 }
 
 export default function Login({ onLogin }: LoginProps) {
@@ -25,6 +26,9 @@ export default function Login({ onLogin }: LoginProps) {
   const [name, setName] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [isRegisterMode, setIsRegisterMode] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
+
 
   // Credenciales preestablecidas para demostración fácil
   const DEMO_USERS = [
@@ -62,28 +66,96 @@ export default function Login({ onLogin }: LoginProps) {
     setError('');
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setSuccessMessage('');
 
     if (!email) {
       setError('Por favor ingresa un correo electrónico.');
       return;
     }
+    if (!password) {
+      setError('Por favor ingresa una contraseña.');
+      return;
+    }
 
     setIsLoading(true);
 
-    // Simular un pequeño retardo de red premium
-    setTimeout(() => {
-      setIsLoading(false);
-      
-      // Encontrar si corresponde a algún usuario de demostración
-      const matchedDemo = DEMO_USERS.find(u => u.email.toLowerCase() === email.toLowerCase());
-      const finalRole = matchedDemo ? matchedDemo.role : role;
-      const finalName = matchedDemo ? matchedDemo.name : (name || (finalRole === 'Admin' ? 'Samuel V. (iGenius)' : finalRole === 'Equipo' ? 'Carlos Gómez (Diseño)' : 'Sofía Pasquel (Gerente)'));
+    if (isSupabaseConfigured && supabase) {
+      try {
+        if (isRegisterMode) {
+          // Registrar usuario en Supabase Auth
+          const { data, error: signUpError } = await supabase.auth.signUp({
+            email,
+            password,
+            options: {
+              data: {
+                name: name || email.split('@')[0],
+                role: role
+              }
+            }
+          });
 
-      onLogin(finalRole, finalName);
-    }, 1200);
+          if (signUpError) {
+            setError(signUpError.message);
+          } else {
+            setSuccessMessage(
+              data.session 
+                ? '¡Registro exitoso! Iniciando sesión...' 
+                : '¡Cuenta creada con éxito! Revisa tu bandeja de entrada si la confirmación está activa.'
+            );
+            
+            if (data.session && data.user) {
+              const meta = data.user.user_metadata || {};
+              const finalRole = (meta.role as 'Admin' | 'Equipo' | 'Cliente') || 'Admin';
+              const finalName = meta.name || data.user.email?.split('@')[0] || 'Usuario';
+              onLogin(finalRole, finalName, data.user.email || email);
+            } else {
+              setPassword('');
+              setIsRegisterMode(false);
+            }
+          }
+        } else {
+          // Iniciar sesión en Supabase Auth
+          const { data, error: signInError } = await supabase.auth.signInWithPassword({
+            email,
+            password
+          });
+
+          if (signInError) {
+            setError(signInError.message);
+          } else if (data.user) {
+            const meta = data.user.user_metadata || {};
+            const finalRole = (meta.role as 'Admin' | 'Equipo' | 'Cliente') || 'Admin';
+            const finalName = meta.name || data.user.email?.split('@')[0] || 'Usuario';
+            onLogin(finalRole, finalName, data.user.email || email);
+          }
+        }
+      } catch (err: any) {
+        setError(err?.message || 'Ocurrió un error inesperado al conectar con Supabase.');
+      } finally {
+        setIsLoading(false);
+      }
+    } else {
+      // Simular con setTimeouts (como antes)
+      setTimeout(() => {
+        setIsLoading(false);
+        
+        if (isRegisterMode) {
+          setSuccessMessage('¡Cuenta simulada creada con éxito! Ahora puedes iniciar sesión.');
+          setIsRegisterMode(false);
+          setPassword('');
+        } else {
+          const matchedDemo = DEMO_USERS.find(u => u.email.toLowerCase() === email.toLowerCase());
+          const finalRole = matchedDemo ? matchedDemo.role : role;
+          const finalName = matchedDemo ? matchedDemo.name : (name || (finalRole === 'Admin' ? 'Samuel V. (iGenius)' : finalRole === 'Equipo' ? 'Carlos Gómez (Diseño)' : 'Sofía Pasquel (Gerente)'));
+          const finalEmail = matchedDemo ? matchedDemo.email : email;
+
+          onLogin(finalRole, finalName, finalEmail);
+        }
+      }, 1200);
+    }
   };
 
   return (
@@ -96,7 +168,7 @@ export default function Login({ onLogin }: LoginProps) {
       <div className="w-full max-w-md z-10">
         
         {/* Brand Header */}
-        <div className="flex flex-col items-center mb-8 text-center">
+        <div className="flex flex-col items-center mb-6 text-center">
           <motion.div 
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
@@ -105,6 +177,7 @@ export default function Login({ onLogin }: LoginProps) {
           >
             <TrendingUp className="w-6 h-6" />
           </motion.div>
+          
           <motion.h1 
             initial={{ y: 10, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
@@ -113,6 +186,7 @@ export default function Login({ onLogin }: LoginProps) {
           >
             WeekTrack <span className="text-xs bg-slate-800 text-slate-400 border border-slate-700 px-2 py-0.5 rounded-full ml-1.5 font-bold">Live v1.3</span>
           </motion.h1>
+          
           <motion.p 
             initial={{ y: 10, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
@@ -121,6 +195,26 @@ export default function Login({ onLogin }: LoginProps) {
           >
             Tablero de Colaboración de Alta Fidelidad en Tiempo Real para Agencias y Clientes
           </motion.p>
+
+          {/* Database Connection Status Badge */}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.3 }}
+            className="mt-3"
+          >
+            {isSupabaseConfigured ? (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-950/60 border border-emerald-900/50 text-emerald-400 rounded-full text-[10px] font-black">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                Base de Datos Supabase Activa
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-950/60 border border-amber-900/50 text-amber-400 rounded-full text-[10px] font-black">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                Modo Demostración (Simulado)
+              </span>
+            )}
+          </motion.div>
         </div>
 
         {/* Main Card */}
@@ -130,56 +224,52 @@ export default function Login({ onLogin }: LoginProps) {
           transition={{ duration: 0.5, delay: 0.2 }}
           className="bg-slate-900/80 backdrop-blur-xl border border-slate-800/80 rounded-3xl p-6 shadow-2xl relative"
         >
-          {/* Quick Select Panel */}
-          <div className="mb-6">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-3">
-              Seleccionar Perfil de Acceso Rápido
-            </span>
-            <div className="space-y-2">
-              {DEMO_USERS.map((user) => (
-                <button
-                  key={user.role}
-                  type="button"
-                  onClick={() => handleQuickSelect(user)}
-                  className={`w-full text-left p-2.5 rounded-xl border transition-all duration-200 cursor-pointer flex items-start gap-3 ${
-                    email === user.email
-                      ? 'bg-slate-800 border-blue-500/50 shadow-md shadow-blue-500/5'
-                      : 'bg-slate-950/40 border-slate-800/55 hover:bg-slate-800/40 hover:border-slate-700'
-                  }`}
-                >
-                  <div className={`w-8 h-8 rounded-full ${user.color} flex items-center justify-center text-white text-xs font-black shrink-0`}>
-                    {user.avatar}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-white block truncate">{user.name}</span>
-                      <span className={`text-[8px] font-extrabold uppercase px-1.5 py-0.5 rounded ${
-                        user.role === 'Admin' ? 'bg-blue-950 text-blue-400 border border-blue-900/60' :
-                        user.role === 'Equipo' ? 'bg-indigo-950 text-indigo-400 border border-indigo-900/60' :
-                        'bg-emerald-950 text-emerald-400 border border-emerald-900/60'
-                      }`}>
-                        {user.role}
-                      </span>
-                    </div>
-                    <span className="text-[10px] text-slate-400 block truncate mt-0.5">{user.desc}</span>
-                  </div>
-                </button>
-              ))}
-            </div>
+          {/* Tabs Mode Switcher */}
+          <div className="flex border-b border-slate-800/60 pb-3 mb-4 justify-around gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setIsRegisterMode(false);
+                setError('');
+                setSuccessMessage('');
+              }}
+              className={`flex-1 pb-1.5 text-xs font-bold transition-all border-b-2 text-center cursor-pointer ${
+                !isRegisterMode
+                  ? 'border-indigo-500 text-white font-black'
+                  : 'border-transparent text-slate-500 hover:text-slate-300'
+              }`}
+            >
+              Iniciar Sesión
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setIsRegisterMode(true);
+                setError('');
+                setSuccessMessage('');
+              }}
+              className={`flex-1 pb-1.5 text-xs font-bold transition-all border-b-2 text-center cursor-pointer ${
+                isRegisterMode
+                  ? 'border-indigo-500 text-white font-black'
+                  : 'border-transparent text-slate-500 hover:text-slate-300'
+              }`}
+            >
+              Registrarse
+            </button>
           </div>
 
-          <div className="relative flex py-2 items-center">
-            <div className="flex-grow border-t border-slate-800"></div>
-            <span className="flex-shrink mx-4 text-slate-500 text-[9px] font-extrabold uppercase tracking-widest">O CREDENCIALES</span>
-            <div className="flex-grow border-t border-slate-800"></div>
-          </div>
-
-          {/* Regular Login Form */}
-          <form onSubmit={handleSubmit} className="space-y-4 mt-3">
+          <form onSubmit={handleSubmit} className="space-y-4">
             {error && (
               <div className="p-3 bg-red-950/40 border border-red-900/50 text-red-300 rounded-xl text-xs flex items-center gap-2">
                 <span className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0" />
                 <span>{error}</span>
+              </div>
+            )}
+
+            {successMessage && (
+              <div className="p-3 bg-emerald-950/40 border border-emerald-900/50 text-emerald-300 rounded-xl text-xs flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
+                <span>{successMessage}</span>
               </div>
             )}
 
@@ -222,8 +312,8 @@ export default function Login({ onLogin }: LoginProps) {
               </div>
             </div>
 
-            {/* Custom fields when typing unknown emails */}
-            {!DEMO_USERS.some(u => u.email.toLowerCase() === email.toLowerCase()) && email.includes('@') && (
+            {/* Custom fields for registration or when typing unknown emails in Simulation */}
+            {(isRegisterMode || (!isSupabaseConfigured && !DEMO_USERS.some(u => u.email.toLowerCase() === email.toLowerCase()) && email.includes('@'))) && (
               <motion.div 
                 initial={{ height: 0, opacity: 0 }}
                 animate={{ height: 'auto', opacity: 1 }}
@@ -279,11 +369,11 @@ export default function Login({ onLogin }: LoginProps) {
               {isLoading ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin text-white" />
-                  <span>Verificando Credenciales...</span>
+                  <span>{isRegisterMode ? 'Creando Cuenta...' : 'Verificando Credenciales...'}</span>
                 </>
               ) : (
                 <>
-                  <span>Ingresar a WeekTrack</span>
+                  <span>{isRegisterMode ? 'Registrarme en WeekTrack' : 'Ingresar a WeekTrack'}</span>
                   <ArrowRight className="w-4 h-4" />
                 </>
               )}

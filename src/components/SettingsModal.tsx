@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { X, Settings, Shield, Bell, Database, Check, Palette } from 'lucide-react';
+import { X, Settings, Shield, Bell, Database, Check, Palette, Mail, Lock } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { supabase, isSupabaseConfigured } from '../supabase';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -12,6 +13,8 @@ interface SettingsModalProps {
   setDefaultPriority: (priority: string) => void;
   enableAlerts: boolean;
   setEnableAlerts: (enable: boolean) => void;
+  activeUserEmail: string;
+  onUpdateEmail: (email: string) => void;
 }
 
 const APP_COLORS = [
@@ -32,8 +35,81 @@ export default function SettingsModal({
   setDefaultPriority,
   enableAlerts,
   setEnableAlerts,
+  activeUserEmail,
+  onUpdateEmail,
 }: SettingsModalProps) {
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  const [newEmail, setNewEmail] = useState(activeUserEmail);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  
+  const [emailSuccess, setEmailSuccess] = useState<string | null>(null);
+  const [passwordSuccess, setPasswordSuccess] = useState<string | null>(null);
+  const [emailError, setEmailError] = useState<string | null>(null);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setNewEmail(activeUserEmail);
+  }, [activeUserEmail]);
+
+  const handleUpdateEmailSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setEmailError(null);
+    setEmailSuccess(null);
+    if (!newEmail.trim() || !newEmail.includes('@')) {
+      setEmailError('Por favor, ingresa un correo electrónico válido.');
+      return;
+    }
+    if (isSupabaseConfigured && supabase) {
+      const { error } = await supabase.auth.updateUser({
+        email: newEmail.trim()
+      });
+      if (error) {
+        setEmailError(error.message);
+        return;
+      }
+      setEmailSuccess('¡Correo actualizado! Revisa los enlaces de confirmación enviados a tu antiguo y nuevo correo.');
+    } else {
+      onUpdateEmail(newEmail.trim());
+      setEmailSuccess('¡Correo electrónico actualizado con éxito!');
+    }
+    setTimeout(() => setEmailSuccess(null), 4000);
+  };
+
+  const handleUpdatePasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasswordError(null);
+    setPasswordSuccess(null);
+    if (!newPassword) {
+      setPasswordError('La contraseña no puede estar vacía.');
+      return;
+    }
+    if (newPassword.length < 6) {
+      setPasswordError('La contraseña debe tener al menos 6 caracteres.');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordError('Las contraseñas no coinciden.');
+      return;
+    }
+    if (isSupabaseConfigured && supabase) {
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword
+      });
+      if (error) {
+        setPasswordError(error.message);
+        return;
+      }
+      setPasswordSuccess('¡Contraseña actualizada con éxito en Supabase!');
+    } else {
+      sessionStorage.setItem('wt_simulated_password_updated', 'true');
+      setPasswordSuccess('¡Contraseña actualizada con éxito!');
+    }
+    setNewPassword('');
+    setConfirmPassword('');
+    setTimeout(() => setPasswordSuccess(null), 3000);
+  };
 
   const handleReset = () => {
     if (confirm('⚠️ ¿Estás completamente seguro de restablecer el sistema? Esto eliminará todos los entregables, clientes personalizados y comentarios cargados, volviendo a la simulación inicial.')) {
@@ -169,6 +245,105 @@ export default function SettingsModal({
                   <span className="w-5 h-5 rounded-full bg-white shadow-sm" />
                 </button>
               </div>
+            </div>
+
+            {/* Ajustes de Cuenta (Modificar Correo y Contraseña) */}
+            <div className="space-y-4 pt-4 border-t border-slate-150">
+              <label className="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase tracking-wider">
+                <Settings className="w-4 h-4 text-slate-400" />
+                Ajustes de Cuenta (Seguridad)
+              </label>
+              
+              {/* Formulario de Cambio de Correo */}
+              <form onSubmit={handleUpdateEmailSubmit} className="space-y-2 bg-slate-50 border border-slate-100 p-3.5 rounded-xl">
+                <span className="text-xs font-bold text-slate-700 block">Actualizar Correo Electrónico</span>
+                {emailSuccess && (
+                  <div className="p-2 bg-emerald-50 border border-emerald-150 text-emerald-800 rounded-lg text-[11px] font-bold">
+                    {emailSuccess}
+                  </div>
+                )}
+                {emailError && (
+                  <div className="p-2 bg-rose-50 border border-rose-150 text-rose-800 rounded-lg text-[11px] font-bold">
+                    {emailError}
+                  </div>
+                )}
+                <div className="relative">
+                  <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
+                    <Mail className="w-4 h-4" />
+                  </span>
+                  <input
+                    type="email"
+                    value={newEmail}
+                    onChange={(e) => {
+                      setNewEmail(e.target.value);
+                      setEmailError(null);
+                    }}
+                    placeholder="nuevo@correo.com"
+                    className="w-full pl-9 pr-3 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-800 text-xs font-semibold placeholder-slate-400 focus:border-blue-500/80 outline-none"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  style={{ backgroundColor: appColor }}
+                  className="w-full py-1.5 text-white font-bold rounded-lg text-[11px] transition-all cursor-pointer shadow-sm active:scale-[0.98]"
+                >
+                  Guardar Nuevo Correo
+                </button>
+              </form>
+
+              {/* Formulario de Cambio de Contraseña */}
+              <form onSubmit={handleUpdatePasswordSubmit} className="space-y-2 bg-slate-50 border border-slate-100 p-3.5 rounded-xl">
+                <span className="text-xs font-bold text-slate-700 block">Cambiar Contraseña</span>
+                {passwordSuccess && (
+                  <div className="p-2 bg-emerald-50 border border-emerald-150 text-emerald-800 rounded-lg text-[11px] font-bold">
+                    {passwordSuccess}
+                  </div>
+                )}
+                {passwordError && (
+                  <div className="p-2 bg-rose-50 border border-rose-150 text-rose-800 rounded-lg text-[11px] font-bold">
+                    {passwordError}
+                  </div>
+                )}
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="relative">
+                    <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
+                      <Lock className="w-4 h-4" />
+                    </span>
+                    <input
+                      type="password"
+                      value={newPassword}
+                      onChange={(e) => {
+                        setNewPassword(e.target.value);
+                        setPasswordError(null);
+                      }}
+                      placeholder="Nueva contraseña"
+                      className="w-full pl-9 pr-3 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-800 text-xs font-semibold placeholder-slate-400 focus:border-blue-500/80 outline-none"
+                    />
+                  </div>
+                  <div className="relative">
+                    <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
+                      <Lock className="w-4 h-4" />
+                    </span>
+                    <input
+                      type="password"
+                      value={confirmPassword}
+                      onChange={(e) => {
+                        setConfirmPassword(e.target.value);
+                        setPasswordError(null);
+                      }}
+                      placeholder="Confirmar contraseña"
+                      className="w-full pl-9 pr-3 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-800 text-xs font-semibold placeholder-slate-400 focus:border-blue-500/80 outline-none"
+                    />
+                  </div>
+                </div>
+                <button
+                  type="submit"
+                  style={{ backgroundColor: appColor }}
+                  className="w-full py-1.5 text-white font-bold rounded-lg text-[11px] transition-all cursor-pointer shadow-sm active:scale-[0.98]"
+                >
+                  Actualizar Contraseña
+                </button>
+              </form>
             </div>
 
             {/* Mantenimiento de Datos */}
