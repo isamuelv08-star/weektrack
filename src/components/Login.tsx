@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   TrendingUp, 
   Mail, 
@@ -10,27 +10,34 @@ import {
   UserCheck, 
   Key, 
   CheckCircle2, 
-  Loader2 
+  Loader2,
+  Globe
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { supabase, isSupabaseConfigured } from '../supabase';
+import { Company } from '../types';
 
 interface LoginProps {
-  onLogin: (role: 'Admin' | 'Equipo' | 'Cliente', name: string, email: string) => void;
+  onLogin: (role: 'Admin' | 'Equipo' | 'Cliente', name: string, email: string, companyId?: string) => void;
+  companies: Company[];
 }
 
-export default function Login({ onLogin }: LoginProps) {
+export default function Login({ onLogin, companies }: LoginProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState<'Admin' | 'Equipo' | 'Cliente'>('Admin');
   const [name, setName] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  const [isRegisterMode, setIsRegisterMode] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
 
+  // Estados del Link de Compartición Detectado
+  const [linkedCompany, setLinkedCompany] = useState<Company | null>(null);
+  const [linkedRole, setLinkedRole] = useState<'Cliente' | 'Equipo' | null>(null);
+  const [expectedEmail, setExpectedEmail] = useState<string>('');
+  const [expectedName, setExpectedName] = useState<string>('');
 
-  // Credenciales preestablecidas para demostración fácil
+  // Credenciales preestablecidas de respaldo
   const DEMO_USERS = [
     {
       role: 'Admin' as const,
@@ -58,6 +65,42 @@ export default function Login({ onLogin }: LoginProps) {
     }
   ];
 
+  // Detectar link compartido y vincular inicio de sesión
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const companyParam = params.get('company');
+    const roleParam = params.get('role');
+
+    if (companyParam && roleParam) {
+      // Buscar compañía por ID
+      const comp = companies.find(c => c.id === companyParam);
+      if (comp) {
+        setLinkedCompany(comp);
+        
+        const isClient = roleParam.toLowerCase() === 'cliente';
+        const isTeam = roleParam.toLowerCase() === 'equipo';
+        
+        if (isClient) {
+          setLinkedRole('Cliente');
+          setRole('Cliente');
+          const resolvedEmail = comp.managerEmail || 'sofia@mundillantas.com';
+          const resolvedName = comp.managerName || 'Sofía Pasquel (Gerente)';
+          setExpectedEmail(resolvedEmail);
+          setExpectedName(resolvedName);
+          setEmail(resolvedEmail); // Pre-cargar para facilitarle la vida al cliente
+        } else if (isTeam) {
+          setLinkedRole('Equipo');
+          setRole('Equipo');
+          const resolvedEmail = comp.teamEmail || 'carlos@igenius.com';
+          const resolvedName = comp.teamName || 'Carlos Gómez (Diseño)';
+          setExpectedEmail(resolvedEmail);
+          setExpectedName(resolvedName);
+          setEmail(resolvedEmail); // Pre-cargar para facilitarle la vida al equipo
+        }
+      }
+    }
+  }, [companies]);
+
   const handleQuickSelect = (user: typeof DEMO_USERS[number]) => {
     setEmail(user.email);
     setPassword('••••••••');
@@ -80,57 +123,35 @@ export default function Login({ onLogin }: LoginProps) {
       return;
     }
 
+    // Validación estricta si es un link compartido: El correo de inicio debe coincidir con la cuenta del enlace
+    if (linkedCompany && linkedRole) {
+      const formattedEmail = email.trim().toLowerCase();
+      const targetExpected = expectedEmail.trim().toLowerCase();
+      const isAdminEmail = formattedEmail === 'samuel@igenius.com'; // El admin puede entrar a cualquier link
+
+      if (formattedEmail !== targetExpected && !isAdminEmail) {
+        setError(`Acceso Restringido: El correo ingresado no coincide con la cuenta autorizada para esta empresa. Por favor, inicia sesión con: ${expectedEmail}`);
+        return;
+      }
+    }
+
     setIsLoading(true);
 
     if (isSupabaseConfigured && supabase) {
       try {
-        if (isRegisterMode) {
-          // Registrar usuario en Supabase Auth
-          const { data, error: signUpError } = await supabase.auth.signUp({
-            email,
-            password,
-            options: {
-              data: {
-                name: name || email.split('@')[0],
-                role: role
-              }
-            }
-          });
+        // Iniciar sesión real en Supabase Auth
+        const { data, error: signInError } = await supabase.auth.signInWithPassword({
+          email,
+          password
+        });
 
-          if (signUpError) {
-            setError(signUpError.message);
-          } else {
-            setSuccessMessage(
-              data.session 
-                ? '¡Registro exitoso! Iniciando sesión...' 
-                : '¡Cuenta creada con éxito! Revisa tu bandeja de entrada si la confirmación está activa.'
-            );
-            
-            if (data.session && data.user) {
-              const meta = data.user.user_metadata || {};
-              const finalRole = (meta.role as 'Admin' | 'Equipo' | 'Cliente') || 'Admin';
-              const finalName = meta.name || data.user.email?.split('@')[0] || 'Usuario';
-              onLogin(finalRole, finalName, data.user.email || email);
-            } else {
-              setPassword('');
-              setIsRegisterMode(false);
-            }
-          }
-        } else {
-          // Iniciar sesión en Supabase Auth
-          const { data, error: signInError } = await supabase.auth.signInWithPassword({
-            email,
-            password
-          });
-
-          if (signInError) {
-            setError(signInError.message);
-          } else if (data.user) {
-            const meta = data.user.user_metadata || {};
-            const finalRole = (meta.role as 'Admin' | 'Equipo' | 'Cliente') || 'Admin';
-            const finalName = meta.name || data.user.email?.split('@')[0] || 'Usuario';
-            onLogin(finalRole, finalName, data.user.email || email);
-          }
+        if (signInError) {
+          setError(signInError.message);
+        } else if (data.user) {
+          const meta = data.user.user_metadata || {};
+          const finalRole = linkedRole || (meta.role as 'Admin' | 'Equipo' | 'Cliente') || 'Admin';
+          const finalName = expectedName || meta.name || data.user.email?.split('@')[0] || 'Usuario';
+          onLogin(finalRole, finalName, data.user.email || email, linkedCompany?.id);
         }
       } catch (err: any) {
         setError(err?.message || 'Ocurrió un error inesperado al conectar con Supabase.');
@@ -138,22 +159,18 @@ export default function Login({ onLogin }: LoginProps) {
         setIsLoading(false);
       }
     } else {
-      // Simular con setTimeouts (como antes)
+      // Simular inicio de sesión en modo Demo
       setTimeout(() => {
         setIsLoading(false);
         
-        if (isRegisterMode) {
-          setSuccessMessage('¡Cuenta simulada creada con éxito! Ahora puedes iniciar sesión.');
-          setIsRegisterMode(false);
-          setPassword('');
-        } else {
-          const matchedDemo = DEMO_USERS.find(u => u.email.toLowerCase() === email.toLowerCase());
-          const finalRole = matchedDemo ? matchedDemo.role : role;
-          const finalName = matchedDemo ? matchedDemo.name : (name || (finalRole === 'Admin' ? 'Samuel V. (iGenius)' : finalRole === 'Equipo' ? 'Carlos Gómez (Diseño)' : 'Sofía Pasquel (Gerente)'));
-          const finalEmail = matchedDemo ? matchedDemo.email : email;
+        const formattedEmail = email.trim().toLowerCase();
+        const matchedDemo = DEMO_USERS.find(u => u.email.toLowerCase() === formattedEmail);
+        
+        const finalRole = linkedRole || (matchedDemo ? matchedDemo.role : role);
+        const finalName = expectedName || (matchedDemo ? matchedDemo.name : (name || (finalRole === 'Admin' ? 'Samuel V. (iGenius)' : finalRole === 'Equipo' ? 'Carlos Gómez (Diseño)' : 'Sofía Pasquel (Gerente)')));
+        const finalEmail = matchedDemo ? matchedDemo.email : email;
 
-          onLogin(finalRole, finalName, finalEmail);
-        }
+        onLogin(finalRole, finalName, finalEmail, linkedCompany?.id);
       }, 1200);
     }
   };
@@ -195,9 +212,35 @@ export default function Login({ onLogin }: LoginProps) {
           >
             Tablero de Colaboración de Alta Fidelidad en Tiempo Real para Agencias y Clientes
           </motion.p>
-
-
         </div>
+
+        {/* Personalized Welcome Greeting Card from Shared Link */}
+        {linkedCompany && (
+          <motion.div
+            initial={{ scale: 0.95, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="mb-5 bg-gradient-to-r from-blue-950/80 to-indigo-950/80 border border-blue-900/60 p-4 rounded-2xl text-center shadow-lg relative overflow-hidden"
+          >
+            <div className="absolute top-0 right-0 p-2 text-blue-500/20">
+              <Globe className="w-16 h-16" />
+            </div>
+            
+            <span className="inline-block px-2.5 py-0.5 bg-blue-500/20 text-blue-400 rounded-full text-[9px] font-black uppercase tracking-wider mb-2 border border-blue-500/30">
+              Enlace de {linkedRole === 'Cliente' ? 'Gerente' : 'Equipo'} Detectado
+            </span>
+            <h3 className="text-sm font-black text-white leading-tight">
+              ¡Hola, {expectedName}!
+            </h3>
+            <p className="text-[11px] text-slate-300 mt-1">
+              Te damos la bienvenida al panel oficial de <strong className="text-blue-400 font-extrabold">{linkedCompany.name}</strong>.
+            </p>
+            <p className="text-[10px] text-slate-400 mt-2 font-semibold">
+              Por favor inicia sesión utilizando el correo autorizado:
+              <br />
+              <span className="text-white underline">{expectedEmail}</span>
+            </p>
+          </motion.div>
+        )}
 
         {/* Main Card */}
         <motion.div
@@ -206,45 +249,18 @@ export default function Login({ onLogin }: LoginProps) {
           transition={{ duration: 0.5, delay: 0.2 }}
           className="bg-slate-900/80 backdrop-blur-xl border border-slate-800/80 rounded-3xl p-6 shadow-2xl relative"
         >
-          {/* Tabs Mode Switcher */}
-          <div className="flex border-b border-slate-800/60 pb-3 mb-4 justify-around gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                setIsRegisterMode(false);
-                setError('');
-                setSuccessMessage('');
-              }}
-              className={`flex-1 pb-1.5 text-xs font-bold transition-all border-b-2 text-center cursor-pointer ${
-                !isRegisterMode
-                  ? 'border-indigo-500 text-white font-black'
-                  : 'border-transparent text-slate-500 hover:text-slate-300'
-              }`}
-            >
+          {/* Sign In Only Header */}
+          <div className="pb-3.5 border-b border-slate-800/60 mb-5">
+            <h2 className="text-sm font-black text-slate-200 text-center tracking-wide uppercase">
               Iniciar Sesión
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setIsRegisterMode(true);
-                setError('');
-                setSuccessMessage('');
-              }}
-              className={`flex-1 pb-1.5 text-xs font-bold transition-all border-b-2 text-center cursor-pointer ${
-                isRegisterMode
-                  ? 'border-indigo-500 text-white font-black'
-                  : 'border-transparent text-slate-500 hover:text-slate-300'
-              }`}
-            >
-              Registrarse
-            </button>
+            </h2>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             {error && (
-              <div className="p-3 bg-red-950/40 border border-red-900/50 text-red-300 rounded-xl text-xs flex items-center gap-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0" />
-                <span>{error}</span>
+              <div className="p-3 bg-red-950/50 border border-red-900/60 text-red-300 rounded-xl text-xs flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0 animate-ping" />
+                <span className="font-semibold">{error}</span>
               </div>
             )}
 
@@ -294,55 +310,6 @@ export default function Login({ onLogin }: LoginProps) {
               </div>
             </div>
 
-            {/* Custom fields for registration or when typing unknown emails in Simulation */}
-            {(isRegisterMode || (!isSupabaseConfigured && !DEMO_USERS.some(u => u.email.toLowerCase() === email.toLowerCase()) && email.includes('@'))) && (
-              <motion.div 
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: 'auto', opacity: 1 }}
-                className="space-y-4 pt-1 overflow-hidden"
-              >
-                <div>
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">
-                    Nombre Completo
-                  </label>
-                  <div className="relative">
-                    <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-500">
-                      <User className="w-4 h-4" />
-                    </span>
-                    <input
-                      type="text"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      placeholder="Tu nombre aquí"
-                      className="w-full pl-10 pr-4 py-2.5 bg-slate-950 border border-slate-800 focus:border-indigo-500/80 focus:ring-1 focus:ring-indigo-500/30 rounded-xl text-slate-200 text-xs font-semibold placeholder-slate-600 transition-all outline-none"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">
-                    Rol en la Plataforma
-                  </label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {(['Admin', 'Equipo', 'Cliente'] as const).map((r) => (
-                      <button
-                        key={r}
-                        type="button"
-                        onClick={() => setRole(r)}
-                        className={`py-1.5 text-[10px] font-extrabold rounded-xl border transition-all cursor-pointer ${
-                          role === r
-                            ? 'bg-indigo-600 text-white border-indigo-500'
-                            : 'bg-slate-950 text-slate-400 border-slate-800 hover:bg-slate-900'
-                        }`}
-                      >
-                        {r}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </motion.div>
-            )}
-
             <button
               type="submit"
               disabled={isLoading}
@@ -351,16 +318,48 @@ export default function Login({ onLogin }: LoginProps) {
               {isLoading ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin text-white" />
-                  <span>{isRegisterMode ? 'Creando Cuenta...' : 'Verificando Credenciales...'}</span>
+                  <span>Verificando Credenciales...</span>
                 </>
               ) : (
                 <>
-                  <span>{isRegisterMode ? 'Registrarme en WeekTrack' : 'Ingresar a WeekTrack'}</span>
+                  <span>Ingresar a WeekTrack</span>
                   <ArrowRight className="w-4 h-4" />
                 </>
               )}
             </button>
           </form>
+
+          {/* Quick Demo select (Only visible if NOT using a restricted shared company link, to allow fast evaluation) */}
+          {!linkedCompany && !isSupabaseConfigured && (
+            <div className="mt-5 border-t border-slate-800/50 pt-4">
+              <span className="text-[9px] font-black text-slate-500 uppercase tracking-wider block mb-2.5 text-center">
+                Acceso Rápido de Evaluación (Modo Demostración)
+              </span>
+              <div className="space-y-2">
+                {DEMO_USERS.map((user) => (
+                  <button
+                    key={user.role}
+                    type="button"
+                    onClick={() => handleQuickSelect(user)}
+                    className="w-full p-2 bg-slate-950/40 hover:bg-slate-950 border border-slate-800 hover:border-slate-700 rounded-xl text-left transition-all flex items-center gap-2.5 group cursor-pointer"
+                  >
+                    <div className={`w-7 h-7 ${user.color} rounded-lg text-[9.5px] font-black text-white flex items-center justify-center`}>
+                      {user.avatar}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-black text-slate-300 group-hover:text-white transition-colors">{user.name}</span>
+                        <span className="text-[8px] font-black uppercase text-indigo-400 bg-indigo-950/50 px-1 rounded">
+                          {user.role}
+                        </span>
+                      </div>
+                      <p className="text-[8.5px] text-slate-500 truncate">{user.desc}</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </motion.div>
 
         {/* Footer info */}

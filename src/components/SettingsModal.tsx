@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Settings, Shield, Bell, Database, Check, Palette, Mail, Lock } from 'lucide-react';
+import { X, Settings, Shield, Bell, Database, Check, Palette, Mail, Lock, Globe } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { supabase, isSupabaseConfigured } from '../supabase';
 
@@ -48,6 +48,8 @@ export default function SettingsModal({
   const [passwordSuccess, setPasswordSuccess] = useState<string | null>(null);
   const [emailError, setEmailError] = useState<string | null>(null);
   const [passwordError, setPasswordError] = useState<string | null>(null);
+
+  const [customShareDomain, setCustomShareDomain] = useState(() => localStorage.getItem('wt_custom_share_domain') || '');
 
   useEffect(() => {
     setNewEmail(activeUserEmail);
@@ -244,6 +246,34 @@ export default function SettingsModal({
                 >
                   <span className="w-5 h-5 rounded-full bg-white shadow-sm" />
                 </button>
+              </div>
+            </div>
+
+            {/* Dominio de Enlace de Compartición */}
+            <div className="space-y-3 pt-4 border-t border-slate-150">
+              <label className="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase tracking-wider">
+                <Globe className="w-4 h-4 text-slate-400" />
+                Dominio de Enlace de Compartición
+              </label>
+              <p className="text-[11px] text-slate-400 font-medium">
+                Por defecto, los enlaces compartidos usan el dominio de la pestaña actual. Si estás hospedando tu app en un dominio de producción (ej: <code className="bg-slate-100 text-slate-700 px-1 py-0.5 rounded">https://mitrabajo.com</code>), configúralo aquí para que los enlaces se generen correctamente.
+              </p>
+              <div className="space-y-2">
+                <input
+                  type="text"
+                  value={customShareDomain}
+                  onChange={(e) => {
+                    setCustomShareDomain(e.target.value);
+                    localStorage.setItem('wt_custom_share_domain', e.target.value);
+                  }}
+                  placeholder="https://mi-weektrack-app.com"
+                  className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-800 text-xs font-semibold placeholder-slate-400 focus:border-blue-500/80 outline-none"
+                />
+                {customShareDomain && (
+                  <span className="text-[10px] text-emerald-600 font-bold block">
+                    ✓ Enlaces generados apuntarán a: {customShareDomain.replace(/\/$/, '')}/?company=...
+                  </span>
+                )}
               </div>
             </div>
 

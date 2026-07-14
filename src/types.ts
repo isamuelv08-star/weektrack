@@ -8,6 +8,12 @@ export interface Company {
   color: string; // Hex color code or Tailwind color base name
   status: 'activa' | 'archivada';
   notes?: string;
+  managerName?: string;
+  managerEmail?: string;
+  teamName?: string;
+  teamEmail?: string;
+  allowedViewsCliente?: string[]; // e.g. ['calendario', 'kanban']
+  allowedViewsEquipo?: string[];  // e.g. ['calendario', 'kanban', 'roadmap', 'timeline', 'colaboracion']
 }
 
 export interface SubTask {

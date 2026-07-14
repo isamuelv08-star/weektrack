@@ -7,6 +7,12 @@ export const INITIAL_COMPANIES: Company[] = [
     color: '#3b82f6', // Blue
     status: 'activa',
     notes: 'Cliente principal de neumáticos. Enfoque en conversión B2C y reconocimiento de marca.',
+    managerName: 'Sofía Pasquel',
+    managerEmail: 'sofia@mundillantas.com',
+    teamName: 'Equipo de Diseño Mundillantas',
+    teamEmail: 'carlos@igenius.com',
+    allowedViewsCliente: ['calendario', 'kanban', 'colaboracion'],
+    allowedViewsEquipo: ['calendario', 'kanban', 'roadmap', 'timeline', 'colaboracion']
   },
   {
     id: 'c2',
@@ -14,6 +20,12 @@ export const INITIAL_COMPANIES: Company[] = [
     color: '#f97316', // Orange
     status: 'activa',
     notes: 'Distribuidor regional. Campañas de pauta localizadas y generación de leads comerciales.',
+    managerName: 'Gerente Austrollantas',
+    managerEmail: 'gerente@austrollantas.com',
+    teamName: 'Equipo Técnico Austrollantas',
+    teamEmail: 'equipo@austrollantas.com',
+    allowedViewsCliente: ['calendario', 'kanban'],
+    allowedViewsEquipo: ['calendario', 'kanban', 'roadmap']
   },
   {
     id: 'c3',
@@ -21,6 +33,12 @@ export const INITIAL_COMPANIES: Company[] = [
     color: '#10b981', // Emerald
     status: 'activa',
     notes: 'Centro de capacitación y formación profesional. CRM automation y lanzamientos de cursos.',
+    managerName: 'Director CERFIK',
+    managerEmail: 'director@cerfik.com',
+    teamName: 'Equipo CERFIK',
+    teamEmail: 'equipo@cerfik.com',
+    allowedViewsCliente: ['calendario', 'kanban'],
+    allowedViewsEquipo: ['calendario', 'kanban', 'roadmap', 'timeline']
   },
   {
     id: 'c4',
@@ -28,6 +46,12 @@ export const INITIAL_COMPANIES: Company[] = [
     color: '#8b5cf6', // Violet
     status: 'activa',
     notes: 'Instituto de educación básica integral. Posicionamiento SEO y captación de matrículas.',
+    managerName: 'Rector IEBI',
+    managerEmail: 'rector@iebi.com',
+    teamName: 'Equipo IEBI',
+    teamEmail: 'equipo@iebi.com',
+    allowedViewsCliente: ['calendario', 'roadmap'],
+    allowedViewsEquipo: ['calendario', 'kanban', 'roadmap', 'timeline']
   },
   {
     id: 'c5',
@@ -35,6 +59,12 @@ export const INITIAL_COMPANIES: Company[] = [
     color: '#ef4444', // Red
     status: 'activa',
     notes: 'Taller especializado diesel. Campañas de video en YouTube y pauta en Google Maps.',
+    managerName: 'Gerente Pasquel',
+    managerEmail: 'gerente@tecnidiesel.com',
+    teamName: 'Equipo Tecnidiesel',
+    teamEmail: 'equipo@tecnidiesel.com',
+    allowedViewsCliente: ['calendario', 'kanban'],
+    allowedViewsEquipo: ['calendario', 'kanban', 'roadmap', 'timeline']
   },
 ];
 

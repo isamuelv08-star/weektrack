@@ -158,8 +158,6 @@ export default function App() {
 
   // --- ESTADOS DE COLABORACIÓN, SEGURIDAD Y CONTROL DE ROLES ---
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('role')) return true; // Auto-acceso por enlace de compartir
     return sessionStorage.getItem('wt_authenticated') === 'true';
   });
 
@@ -221,72 +219,8 @@ export default function App() {
     '👁️ [10:16 AM] Sofía Pasquel (Gerente de Mundillantas) está visualizando el Gantt.',
   ]);
 
-  // Al montar, revisar si hay roles en la URL y configurar motor de eventos interactivos
+  // Al montar, configurar motor de eventos interactivos de simulación
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const roleParam = params.get('role');
-    const companyParam = params.get('company');
-    const nameParam = params.get('name');
-    
-    let resolvedRole: 'Admin' | 'Equipo' | 'Cliente' | null = null;
-    let resolvedName = '';
-
-    if (roleParam === 'cliente' || roleParam === 'Cliente') {
-      resolvedRole = 'Cliente';
-      resolvedName = nameParam || 'Sofía Pasquel (Gerente)';
-      setActiveUserRole('Cliente');
-      if (companyParam) {
-        setSelectedCompanyId(companyParam);
-      }
-      setActiveUserName(resolvedName);
-      setIsAuthenticated(true);
-    } else if (roleParam === 'equipo' || roleParam === 'Equipo') {
-      resolvedRole = 'Equipo';
-      resolvedName = nameParam || 'Carlos Gómez (Diseño)';
-      setActiveUserRole('Equipo');
-      setActiveUserName(resolvedName);
-      setIsAuthenticated(true);
-    } else if (roleParam === 'admin' || roleParam === 'Admin') {
-      resolvedRole = 'Admin';
-      resolvedName = nameParam || 'Samuel V. (Admin)';
-      setActiveUserRole('Admin');
-      setActiveUserName(resolvedName);
-      setIsAuthenticated(true);
-    }
-
-    if (resolvedRole) {
-      sessionStorage.setItem('wt_authenticated', 'true');
-      sessionStorage.setItem('wt_current_user_name', resolvedName);
-      sessionStorage.setItem('wt_current_user_role', resolvedRole);
-
-      // Auto-registrar solicitud de acceso en estado "pending" si no es Admin
-      if (resolvedRole !== 'Admin') {
-        const localRequestsStr = localStorage.getItem('wt_access_requests');
-        let currentReqs: AccessRequest[] = [];
-        try {
-          currentReqs = localRequestsStr ? JSON.parse(localRequestsStr) : [];
-        } catch (e) {
-          currentReqs = [];
-        }
-
-        const index = currentReqs.findIndex(r => r.role === resolvedRole);
-        if (index === -1) {
-          const newReq: AccessRequest = {
-            id: 'req-' + Date.now(),
-            name: resolvedName,
-            role: resolvedRole,
-            status: 'pending', // Inicia en pendiente para ser aprobado por el Admin
-            timestamp: 'Hace unos instantes'
-          };
-          const updatedReqs = [...currentReqs, newReq];
-          localStorage.setItem('wt_access_requests', JSON.stringify(updatedReqs));
-          setAccessRequests(updatedReqs);
-        } else {
-          setAccessRequests(currentReqs);
-        }
-      }
-    }
-
     const events = [
       'Sofía Pasquel (Gerente de Mundillantas) ha visualizado la vista Gantt.',
       'Carlos Gómez (Diseño) actualizó el checklist de "Diseño de Carruseles" para Austrollantas.',
@@ -319,7 +253,8 @@ export default function App() {
 
   // Generar URL de compartición con roles y parámetros
   const generateSharingLink = (role: 'Admin' | 'Equipo' | 'Cliente', companyId?: string) => {
-    const baseUrl = window.location.origin + window.location.pathname;
+    const customDomain = localStorage.getItem('wt_custom_share_domain');
+    const baseUrl = customDomain ? customDomain.replace(/\/$/, '') : (window.location.origin + window.location.pathname);
     let name = 'Sofía Pasquel';
     if (role === 'Equipo') name = 'Carlos Gómez';
     if (role === 'Admin') name = 'Samuel V.';
@@ -483,8 +418,36 @@ export default function App() {
     };
   }, []);
 
+  // Verificar si la vista está permitida para el rol actual según la configuración de la empresa
+  const isViewAllowed = (viewId: string) => {
+    if (activeUserRole === 'Admin') return true;
+    if (!restrictedCompanyId) return true;
+    const currentCompany = companies.find(c => c.id === restrictedCompanyId);
+    if (!currentCompany) return true;
+    if (activeUserRole === 'Cliente') {
+      return (currentCompany.allowedViewsCliente || ['calendario', 'kanban', 'colaboracion']).includes(viewId);
+    }
+    if (activeUserRole === 'Equipo') {
+      return (currentCompany.allowedViewsEquipo || ['calendario', 'kanban', 'roadmap', 'timeline', 'colaboracion']).includes(viewId);
+    }
+    return true;
+  };
+
+  // Asegurar redirección de pestaña activa si no está permitida para el rol actual
+  useEffect(() => {
+    if (isAuthenticated && activeUserRole !== 'Admin') {
+      if (!isViewAllowed(activeTab)) {
+        const views = ['calendario', 'kanban', 'roadmap', 'timeline', 'colaboracion'];
+        const fallback = views.find(v => isViewAllowed(v)) as any;
+        if (fallback) {
+          setActiveTab(fallback);
+        }
+      }
+    }
+  }, [activeTab, activeUserRole, restrictedCompanyId, isAuthenticated]);
+
   // Handlers de Sesión y Control de Accesos
-  const handleLogin = (role: 'Admin' | 'Equipo' | 'Cliente', name: string, email: string) => {
+  const handleLogin = (role: 'Admin' | 'Equipo' | 'Cliente', name: string, email: string, companyId?: string) => {
     sessionStorage.setItem('wt_authenticated', 'true');
     sessionStorage.setItem('wt_current_user_name', name);
     sessionStorage.setItem('wt_current_user_role', role);
@@ -494,6 +457,27 @@ export default function App() {
     setActiveUserName(name);
     setActiveUserEmail(email);
     setIsAuthenticated(true);
+
+    if (companyId) {
+      sessionStorage.setItem('wt_restricted_company_id', companyId);
+      setRestrictedCompanyId(companyId);
+      setSelectedCompanyId(companyId);
+
+      // Redireccionar a la pestaña permitida si la actual está restringida
+      const currentCompany = companies.find(c => c.id === companyId);
+      if (currentCompany) {
+        const allowed = role === 'Cliente'
+          ? (currentCompany.allowedViewsCliente || ['calendario', 'kanban', 'colaboracion'])
+          : (currentCompany.allowedViewsEquipo || ['calendario', 'kanban', 'roadmap', 'timeline', 'colaboracion']);
+        
+        if (!allowed.includes(activeTab)) {
+          const fallback = allowed[0] as 'calendario' | 'kanban' | 'roadmap' | 'timeline' | 'colaboracion';
+          if (fallback) {
+            setActiveTab(fallback);
+          }
+        }
+      }
+    }
 
     // Asegurar que exista una solicitud si no es Admin
     if (role !== 'Admin') {
@@ -752,7 +736,7 @@ export default function App() {
     selectedPriority !== 'all';
 
   if (!isAuthenticated) {
-    return <Login onLogin={handleLogin} />;
+    return <Login onLogin={handleLogin} companies={companies} />;
   }
 
   if (restrictedCompanyNotFound) {
@@ -832,22 +816,24 @@ export default function App() {
           </button>
 
           {/* Colaboración & Chat */}
-          <button
-            id="tab-colaboracion"
-            onClick={() => setActiveTab('colaboracion')}
-            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer text-left ${
-              activeTab === 'colaboracion'
-                ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/10'
-                : 'text-slate-400 hover:bg-slate-800/50 hover:text-white'
-            }`}
-          >
-            <MessageSquare className="w-4 h-4 flex-shrink-0 text-emerald-400" />
-            {isSidebarOpen && (
-              <div className="flex items-center justify-between flex-1">
-                <span>Colaboración & Chat</span>
-              </div>
-            )}
-          </button>
+          {isViewAllowed('colaboracion') && (
+            <button
+              id="tab-colaboracion"
+              onClick={() => setActiveTab('colaboracion')}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer text-left ${
+                activeTab === 'colaboracion'
+                  ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/10'
+                  : 'text-slate-400 hover:bg-slate-800/50 hover:text-white'
+              }`}
+            >
+              <MessageSquare className="w-4 h-4 flex-shrink-0 text-emerald-400" />
+              {isSidebarOpen && (
+                <div className="flex items-center justify-between flex-1">
+                  <span>Colaboración & Chat</span>
+                </div>
+              )}
+            </button>
+          )}
         </div>
 
         {/* Sidebar Action Buttons (Clientes & Reporte de Mes) */}
@@ -1010,15 +996,6 @@ export default function App() {
                     );
                   })()}
                 </div>
-              </div>
-
-              {/* Info actual del rol */}
-              <div className="hidden lg:flex items-center gap-2 bg-slate-100 px-3 py-1.5 rounded-xl border border-slate-200">
-                <UserCheck className="w-3.5 h-3.5 text-blue-600" />
-                <span className="text-xs font-bold text-slate-700">
-                  {activeUserRole === 'Admin' ? 'Líder Sistema' : activeUserRole === 'Equipo' ? 'Equipo Técnico' : 'Gerente Cliente'}
-                </span>
-                <span className="text-[10px] text-slate-400">• {activeUserName} ({activeUserEmail})</span>
               </div>
 
               {/* Selector de Clientes Global en Cabecera */}
@@ -1625,61 +1602,69 @@ export default function App() {
               {/* --- MENÚ DE VISTAS (TABS INTERNAS) --- */}
               <div className="flex flex-col md:flex-row justify-between items-stretch md:items-center gap-4 bg-white border border-slate-200 p-3.5 rounded-2xl shadow-xs">
                 <div className="bg-slate-100 p-1 rounded-xl flex border border-slate-200 overflow-x-auto scrollbar-none flex-1 md:flex-initial">
-                  <button
-                    id="inner-tab-calendario"
-                    onClick={() => setActiveTab('calendario')}
-                    className={`flex items-center justify-center gap-2 px-4 py-2 text-xs font-bold rounded-lg transition-all cursor-pointer flex-1 md:flex-initial whitespace-nowrap ${
-                      activeTab === 'calendario'
-                        ? 'bg-white shadow-sm'
-                        : 'text-slate-600 hover:text-slate-800'
-                    }`}
-                    style={activeTab === 'calendario' ? { color: appColor } : {}}
-                  >
-                    <Calendar className="w-4 h-4" />
-                    <span>Calendario</span>
-                  </button>
+                  {isViewAllowed('calendario') && (
+                    <button
+                      id="inner-tab-calendario"
+                      onClick={() => setActiveTab('calendario')}
+                      className={`flex items-center justify-center gap-2 px-4 py-2 text-xs font-bold rounded-lg transition-all cursor-pointer flex-1 md:flex-initial whitespace-nowrap ${
+                        activeTab === 'calendario'
+                          ? 'bg-white shadow-sm'
+                          : 'text-slate-600 hover:text-slate-800'
+                      }`}
+                      style={activeTab === 'calendario' ? { color: appColor } : {}}
+                    >
+                      <Calendar className="w-4 h-4" />
+                      <span>Calendario</span>
+                    </button>
+                  )}
 
-                  <button
-                    id="inner-tab-kanban"
-                    onClick={() => setActiveTab('kanban')}
-                    className={`flex items-center justify-center gap-2 px-4 py-2 text-xs font-bold rounded-lg transition-all cursor-pointer flex-1 md:flex-initial whitespace-nowrap ${
-                      activeTab === 'kanban'
-                        ? 'bg-white shadow-sm'
-                        : 'text-slate-600 hover:text-slate-800'
-                    }`}
-                    style={activeTab === 'kanban' ? { color: appColor } : {}}
-                  >
-                    <Layers className="w-4 h-4" />
-                    <span>Tablero Kanban</span>
-                  </button>
+                  {isViewAllowed('kanban') && (
+                    <button
+                      id="inner-tab-kanban"
+                      onClick={() => setActiveTab('kanban')}
+                      className={`flex items-center justify-center gap-2 px-4 py-2 text-xs font-bold rounded-lg transition-all cursor-pointer flex-1 md:flex-initial whitespace-nowrap ${
+                        activeTab === 'kanban'
+                          ? 'bg-white shadow-sm'
+                          : 'text-slate-600 hover:text-slate-800'
+                      }`}
+                      style={activeTab === 'kanban' ? { color: appColor } : {}}
+                    >
+                      <Layers className="w-4 h-4" />
+                      <span>Tablero Kanban</span>
+                    </button>
+                  )}
 
-                  <button
-                    id="inner-tab-roadmap"
-                    onClick={() => setActiveTab('roadmap')}
-                    className={`flex items-center justify-center gap-2 px-4 py-2 text-xs font-bold rounded-lg transition-all cursor-pointer flex-1 md:flex-initial whitespace-nowrap ${
-                      activeTab === 'roadmap'
-                        ? 'bg-white shadow-sm'
-                        : 'text-slate-600 hover:text-slate-800'
-                    }`}
-                    style={activeTab === 'roadmap' ? { color: appColor } : {}}
-                  >
-                    <Map className="w-4 h-4" />
-                    <span>Roadmap</span>
-                  </button>
+                  {isViewAllowed('roadmap') && (
+                    <button
+                      id="inner-tab-roadmap"
+                      onClick={() => setActiveTab('roadmap')}
+                      className={`flex items-center justify-center gap-2 px-4 py-2 text-xs font-bold rounded-lg transition-all cursor-pointer flex-1 md:flex-initial whitespace-nowrap ${
+                        activeTab === 'roadmap'
+                          ? 'bg-white shadow-sm'
+                          : 'text-slate-600 hover:text-slate-800'
+                      }`}
+                      style={activeTab === 'roadmap' ? { color: appColor } : {}}
+                    >
+                      <Map className="w-4 h-4" />
+                      <span>Roadmap</span>
+                    </button>
+                  )}
 
-                  <button
-                    id="inner-tab-timeline"
-                    onClick={() => setActiveTab('timeline')}
-                    className={`flex items-center justify-center gap-2 px-4 py-2 text-xs font-bold rounded-lg transition-all cursor-pointer flex-1 md:flex-initial whitespace-nowrap ${
-                      activeTab === 'timeline'
-                        ? 'bg-white shadow-sm'
-                        : 'text-slate-600 hover:text-slate-800'
-                    }`}
-                    style={activeTab === 'timeline' ? { color: appColor } : {}}
-                  >
-                    <Activity className="w-4 h-4" />
-                    <span>Gantt / Timeline</span>
-                  </button>
+                  {isViewAllowed('timeline') && (
+                    <button
+                      id="inner-tab-timeline"
+                      onClick={() => setActiveTab('timeline')}
+                      className={`flex items-center justify-center gap-2 px-4 py-2 text-xs font-bold rounded-lg transition-all cursor-pointer flex-1 md:flex-initial whitespace-nowrap ${
+                        activeTab === 'timeline'
+                          ? 'bg-white shadow-sm'
+                          : 'text-slate-600 hover:text-slate-800'
+                      }`}
+                      style={activeTab === 'timeline' ? { color: appColor } : {}}
+                    >
+                      <Activity className="w-4 h-4" />
+                      <span>Gantt / Timeline</span>
+                    </button>
+                  )}
                 </div>
                 <div className="hidden sm:block text-[10px] text-slate-400 font-extrabold uppercase tracking-wider px-2">
                   Vista activa: <span className="font-black" style={{ color: appColor }}>{activeTab === 'timeline' ? 'Gantt / Timeline' : activeTab.toUpperCase()}</span>
