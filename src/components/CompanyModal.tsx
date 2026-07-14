@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Company } from '../types';
 import { X, Plus, Trash2, Edit2, Check, Archive, Share2, Shield, Eye, Settings } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -12,6 +12,7 @@ interface CompanyModalProps {
   onAddCompany: (company: Omit<Company, 'id'>) => void;
   onUpdateCompany: (company: Company) => void;
   onDeleteCompany: (id: string) => void;
+  initialEditingId?: string | null;
 }
 
 const COLORS_PRESET = [
@@ -42,6 +43,7 @@ export default function CompanyModal({
   onAddCompany,
   onUpdateCompany,
   onDeleteCompany,
+  initialEditingId,
 }: CompanyModalProps) {
   const { showConfirm, showToast } = useFeedback();
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -77,6 +79,19 @@ export default function CompanyModal({
     setEditingId(null);
     setIsCreating(false);
   };
+
+  useEffect(() => {
+    if (isOpen) {
+      if (initialEditingId) {
+        const c = companies.find((comp) => comp.id === initialEditingId);
+        if (c) {
+          startEdit(c);
+          return;
+        }
+      }
+      resetForm();
+    }
+  }, [isOpen, initialEditingId]);
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
