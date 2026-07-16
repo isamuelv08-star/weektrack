@@ -8,6 +8,7 @@ import CompanyModal from './components/CompanyModal';
 import TaskModal from './components/TaskModal';
 import ReportModal from './components/ReportModal';
 import SettingsModal from './components/SettingsModal';
+import CoeditorsModal from './components/CoeditorsModal';
 
 // Componentes de Seguridad y Acceso
 import Login from './components/Login';
@@ -153,6 +154,7 @@ export default function App() {
   const [isCompanyModalOpen, setIsCompanyModalOpen] = useState(false);
   const [editingCompanyId, setEditingCompanyId] = useState<string | null>(null);
   const [isCompanyDropdownOpen, setIsCompanyDropdownOpen] = useState(false);
+  const [isCoeditorsModalOpen, setIsCoeditorsModalOpen] = useState(false);
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
@@ -886,8 +888,13 @@ export default function App() {
             <Settings className="w-4 h-4 flex-shrink-0 text-indigo-400" />
             {isSidebarOpen && <span>Configuración de App</span>}
           </button>
+        </div>
 
-          {/* Botón Cerrar Sesión */}
+        {/* Spacer layout */}
+        <div className="flex-1" />
+
+        {/* Botón Cerrar Sesión (Al final de la barra, arriba del colapsador) */}
+        <div className="px-4 py-3 border-t border-slate-800/40 flex-shrink-0">
           <button
             id="sidebar-logout-btn"
             onClick={handleLogout}
@@ -897,9 +904,6 @@ export default function App() {
             {isSidebarOpen && <span>Cerrar Sesión</span>}
           </button>
         </div>
-
-        {/* Spacer layout */}
-        <div className="flex-1" />
 
         {/* Collapser controller */}
         <div className="p-3 border-t border-slate-800 flex items-center justify-center flex-shrink-0">
@@ -924,20 +928,36 @@ export default function App() {
         <header className="bg-white border-b border-slate-150 px-6 py-4 sticky top-0 z-40 shadow-xs flex-shrink-0">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             
-            {/* Logo y Eslogan */}
+            {/* Bienvenido/a personalizado */}
             <div className="flex items-center gap-3">
               <button 
                 onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-                className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-600 transition-colors md:hidden"
+                className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-600 transition-colors md:hidden cursor-pointer"
               >
                 <Menu className="w-5 h-5" />
               </button>
               <div>
-                <div className="flex items-center gap-2">
-                  <h1 className="text-lg font-extrabold text-slate-900 tracking-tight">WeekTrack</h1>
-                  <span className="text-[9px] bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full font-bold">Sistema de Seguimiento</span>
+                <div className="flex flex-wrap items-center gap-2">
+                  <h1 className="text-base sm:text-lg font-black text-slate-800 tracking-tight leading-none">
+                    {activeUserRole === 'Admin' ? (
+                      <>¡Bienvenido, Samuel! 👋</>
+                    ) : (
+                      <>¡Hola, {activeUserName.split(' ')[0]}! 👋</>
+                    )}
+                  </h1>
+                  <span className="text-[9px] bg-blue-50 text-blue-600 border border-blue-100 px-2 py-0.5 rounded-full font-black uppercase tracking-wider">
+                    {activeUserRole === 'Admin' ? 'Administrador' : activeUserRole}
+                  </span>
                 </div>
-                <p className="text-xs text-slate-500 font-medium">Metodología de Crecimiento & Avances en Tiempo Real</p>
+                <p className="text-xs text-slate-500 font-medium mt-1">
+                  {activeUserRole === 'Admin' ? (
+                    'Qué gusto saludarte. Revisa tus pendientes y el cronograma para hoy...'
+                  ) : activeUserRole === 'Equipo' ? (
+                    'Co-editor técnico. Revisa y actualiza tus pendientes y checklist asignados hoy.'
+                  ) : (
+                    'Acceso de Cliente. Revisa el estado de tus entregables y los avances del mes.'
+                  )}
+                </p>
               </div>
             </div>
 
@@ -1151,17 +1171,7 @@ export default function App() {
               )}
 
               {/* Crear Tarea */}
-              {activeUserRole !== 'Cliente' && (
-                <button
-                  id="open-task-modal-btn"
-                  onClick={() => handleNewTask()}
-                  className="px-4 py-2 text-white rounded-xl text-xs font-bold transition-all shadow-md hover:brightness-95 flex items-center gap-1.5 cursor-pointer"
-                  style={{ backgroundColor: appColor }}
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>Nueva Tarea</span>
-                </button>
-              )}
+              {activeUserRole !== 'Cliente' && null}
             </div>
 
           </div>
@@ -2142,6 +2152,65 @@ export default function App() {
           sessionStorage.setItem('wt_current_user_email', email);
         }}
       />
+
+      <CoeditorsModal
+        isOpen={isCoeditorsModalOpen}
+        onClose={() => setIsCoeditorsModalOpen(false)}
+        activeUserRole={activeUserRole}
+        activeUserName={activeUserName}
+        companies={companies}
+        selectedCompanyId={selectedCompanyId}
+        accessRequests={accessRequests}
+        onApproveRequest={(id) => setAccessRequests(prev => prev.map(r => r.id === id ? { ...r, status: 'approved' } : r))}
+        onRejectRequest={(id) => setAccessRequests(prev => prev.map(r => r.id === id ? { ...r, status: 'rejected' } : r))}
+      />
+
+      {/* --- BOTONES FLOTANTES MODERNOS --- */}
+      <div className="fixed bottom-6 right-6 z-40 flex flex-col sm:flex-row items-center gap-3">
+        {/* Botón Flotante: Clientes (Solo Admin) */}
+        {activeUserRole === 'Admin' && (
+          <motion.button
+            whileHover={{ scale: 1.05, y: -2 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => setIsCompanyModalOpen(true)}
+            title="Administrar Clientes"
+            className="flex items-center gap-2 bg-white text-slate-700 hover:text-blue-600 border border-slate-200/80 px-4 py-3 rounded-2xl shadow-xl hover:shadow-blue-500/5 transition-all font-extrabold text-xs cursor-pointer select-none"
+          >
+            <Users className="w-4 h-4 text-blue-500" />
+            <span>Clientes</span>
+          </motion.button>
+        )}
+
+        {/* Botón Flotante: Coeditores */}
+        <motion.button
+          whileHover={{ scale: 1.05, y: -2 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={() => setIsCoeditorsModalOpen(true)}
+          title="Gestionar Coeditores e Invitaciones"
+          className="flex items-center gap-2 bg-white text-slate-700 hover:text-indigo-600 border border-slate-200/80 px-4 py-3 rounded-2xl shadow-xl hover:shadow-indigo-500/5 transition-all font-extrabold text-xs cursor-pointer select-none"
+        >
+          <Shield className="w-4 h-4 text-indigo-500" />
+          <span>Coeditores</span>
+          {activeUserRole === 'Admin' && accessRequests.some(r => r.status === 'pending') && (
+            <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
+          )}
+        </motion.button>
+
+        {/* Botón Flotante: Nueva Tarea (Solo si no es Cliente) */}
+        {activeUserRole !== 'Cliente' && (
+          <motion.button
+            whileHover={{ scale: 1.05, y: -2 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => handleNewTask()}
+            title="Registrar Nueva Tarea"
+            className="flex items-center gap-2 text-white px-5 py-3.5 rounded-2xl shadow-xl shadow-blue-500/20 hover:brightness-105 transition-all font-extrabold text-xs cursor-pointer select-none"
+            style={{ backgroundColor: appColor }}
+          >
+            <Plus className="w-4 h-4" />
+            <span>Nueva Tarea</span>
+          </motion.button>
+        )}
+      </div>
 
     </div>
   );
