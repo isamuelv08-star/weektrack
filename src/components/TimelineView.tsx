@@ -24,27 +24,29 @@ export default function TimelineView({
   selectedStatus,
   selectedPriority,
 }: TimelineViewProps) {
-  const year = 2026;
-  const month = 6; // Julio (0-indexed)
-  const daysInMonth = 31;
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = today.getMonth(); // 0-indexed (e.g. 6 for July)
+  const currentDay = today.getDate();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
   const daysArray = Array.from({ length: daysInMonth }, (_, i) => i + 1);
 
-  // Referencia para hacer scroll automático hacia el día de hoy (día 13 de Julio) al cargar
+  // Referencia para hacer scroll automático hacia el día de hoy al cargar
   const timelineGridRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (timelineGridRef.current) {
-      // Desplazar horizontalmente al día de hoy (día 13 de Julio aprox) para centrar
+      // Desplazar horizontalmente al día de hoy para centrar
       const cellWidth = 45; // Ancho aproximado de cada columna de día
       const sidebarWidth = 200; // Ancho de la barra lateral de empresas
-      const scrollPosition = (13 - 1) * cellWidth - (timelineGridRef.current.clientWidth - sidebarWidth) / 2;
+      const scrollPosition = (currentDay - 1) * cellWidth - (timelineGridRef.current.clientWidth - sidebarWidth) / 2;
       timelineGridRef.current.scrollLeft = Math.max(0, scrollPosition);
     }
-  }, []);
+  }, [currentDay]);
 
-  // Filtrar las tareas correspondientes a Julio de 2026 y filtros globales
+  // Filtrar las tareas correspondientes al mes actual y filtros globales
   const filteredTasks = tasks.filter((t) => {
-    // Validar si la tarea cae o se cruza con Julio de 2026
+    // Validar si la tarea cae o se cruza con el mes actual
     const startYMD = t.startDate.split('-');
     const endYMD = t.endDate.split('-');
     const startY = parseInt(startYMD[0]);
@@ -52,10 +54,10 @@ export default function TimelineView({
     const endY = parseInt(endYMD[0]);
     const endM = parseInt(endYMD[1]) - 1;
 
-    const taskInJuly2026 = (startY === 2026 && startM === 6) || (endY === 2026 && endM === 6) ||
-                           (startY <= 2026 && startM <= 6 && endY >= 2026 && endM >= 6);
+    const taskInCurrentMonth = (startY === year && startM === month) || (endY === year && endM === month) ||
+                           (startY <= year && startM <= month && endY >= year && endM >= month);
 
-    if (!taskInJuly2026) return false;
+    if (!taskInCurrentMonth) return false;
 
     // Filtros de UI
     const matchesCompany = selectedCompanyId === 'all' || t.companyId === selectedCompanyId;
@@ -77,21 +79,21 @@ export default function TimelineView({
 
   // Auxiliar para calcular grid-column de inicio y fin para la barra Gantt
   const getGridPlacement = (startDateStr: string, endDateStr: string) => {
-    // Extraer días de Julio
+    // Extraer días del mes actual
     const startParts = startDateStr.split('-');
     const endParts = endDateStr.split('-');
     
     let startDay = 1;
-    if (parseInt(startParts[0]) === 2026 && parseInt(startParts[1]) === 7) {
+    if (parseInt(startParts[0]) === year && parseInt(startParts[1]) === (month + 1)) {
       startDay = parseInt(startParts[2]);
     }
     
     let endDay = daysInMonth;
-    if (parseInt(endParts[0]) === 2026 && parseInt(endParts[1]) === 7) {
+    if (parseInt(endParts[0]) === year && parseInt(endParts[1]) === (month + 1)) {
       endDay = parseInt(endParts[2]);
     }
 
-    // Asegurar límites válidos entre 1 y 31
+    // Asegurar límites válidos entre 1 y daysInMonth
     startDay = Math.max(1, Math.min(daysInMonth, startDay));
     endDay = Math.max(1, Math.min(daysInMonth, endDay));
 
@@ -102,8 +104,14 @@ export default function TimelineView({
   };
 
   const isToday = (dayNum: number) => {
-    return dayNum === 13; // Hoy es 13 de Julio de 2026 según el tiempo del sistema
+    return dayNum === currentDay;
   };
+
+  const monthNames = [
+    'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+    'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+  ];
+  const currentMonthName = monthNames[month];
 
   return (
     <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex flex-col h-[70vh] overflow-hidden" id="timeline-view-container">
@@ -113,17 +121,17 @@ export default function TimelineView({
           <Activity className="w-5 h-5 text-blue-600" />
           <div>
             <h3 className="text-sm font-bold text-slate-800">Diagrama de Gantt Mensual</h3>
-            <p className="text-xs text-slate-500">Cronograma de tareas cruzadas de Julio 2026. Desplázate horizontalmente si es necesario.</p>
+            <p className="text-xs text-slate-500">Cronograma de tareas cruzadas de {currentMonthName} {year}. Desplázate horizontalmente si es necesario.</p>
           </div>
         </div>
         <div className="flex items-center gap-4 text-xs font-semibold text-slate-500">
           <div className="flex items-center gap-1">
             <span className="w-3 h-3 bg-blue-100 border border-blue-300 rounded-sm" />
-            <span>Julio de 2026</span>
+            <span>{currentMonthName} de {year}</span>
           </div>
           <div className="flex items-center gap-1">
             <span className="w-3 h-3 bg-yellow-100 border border-yellow-300 rounded-sm" />
-            <span>Día de Hoy (13)</span>
+            <span>Día de Hoy ({currentDay})</span>
           </div>
         </div>
       </div>
@@ -157,7 +165,7 @@ export default function TimelineView({
                   >
                     <span>{day}</span>
                     <span className="text-[8px] font-medium text-slate-400">
-                      {['D', 'L', 'M', 'M', 'J', 'V', 'S'][(new Date(2026, 6, day).getDay())]}
+                      {['D', 'L', 'M', 'M', 'J', 'V', 'S'][(new Date(year, month, day).getDay())]}
                     </span>
                   </div>
                 );
@@ -187,10 +195,10 @@ export default function TimelineView({
 
                   {/* Celda derecha: Grid Gantt */}
                   <div className="flex-1 grid grid-cols-31 bg-white relative p-3 gap-y-2">
-                    {/* Línea vertical para el día de hoy (13) */}
+                    {/* Línea vertical para el día de hoy */}
                     <div
                       className="absolute top-0 bottom-0 pointer-events-none border-l-2 border-dashed border-yellow-400 bg-yellow-400/5 z-0"
-                      style={{ left: `${(13 - 1) * 45 + 22.5}px` }}
+                      style={{ left: `${(currentDay - 1) * 45 + 22.5}px` }}
                     />
 
                     {/* Render de barras Gantt apiladas */}

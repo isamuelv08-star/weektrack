@@ -16,9 +16,9 @@ const MONTHS = [
 ];
 
 export default function ReportModal({ isOpen, onClose, tasks, companies }: ReportModalProps) {
-  // Inicializar en Julio de 2026 (por la fecha actual)
-  const [selectedMonth, setSelectedMonth] = useState(6); // 0-indexed, 6 = Julio
-  const [selectedYear, setSelectedYear] = useState(2026);
+  // Inicializar en el mes y año actual de forma dinámica
+  const [selectedMonth, setSelectedMonth] = useState(() => new Date().getMonth());
+  const [selectedYear, setSelectedYear] = useState(() => new Date().getFullYear());
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>('all');
   const [copied, setCopied] = useState(false);
 

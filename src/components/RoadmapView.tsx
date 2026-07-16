@@ -14,13 +14,32 @@ interface RoadmapViewProps {
   selectedPriority: string;
 }
 
-const WEEKS_JULY_2026 = [
-  { id: 'w1', label: 'Semana 1 (Jul 01 - Jul 07)', start: '2026-07-01', end: '2026-07-07' },
-  { id: 'w2', label: 'Semana 2 (Jul 08 - Jul 14)', start: '2026-07-08', end: '2026-07-14' },
-  { id: 'w3', label: 'Semana 3 (Jul 15 - Jul 21)', start: '2026-07-15', end: '2026-07-21' },
-  { id: 'w4', label: 'Semana 4 (Jul 22 - Jul 28)', start: '2026-07-22', end: '2026-07-28' },
-  { id: 'w5', label: 'Semana 5 (Jul 29 - Jul 31)', start: '2026-07-29', end: '2026-07-31' },
-];
+const getWeeksOfCurrentMonth = () => {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = today.getMonth(); // 0-indexed
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const monthShortName = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'][month];
+  const mStr = String(month + 1).padStart(2, '0');
+
+  const weeks = [
+    { id: 'w1', label: `Semana 1 (${monthShortName} 01 - ${monthShortName} 07)`, start: `${year}-${mStr}-01`, end: `${year}-${mStr}-07` },
+    { id: 'w2', label: `Semana 2 (${monthShortName} 08 - ${monthShortName} 14)`, start: `${year}-${mStr}-08`, end: `${year}-${mStr}-14` },
+    { id: 'w3', label: `Semana 3 (${monthShortName} 15 - ${monthShortName} 21)`, start: `${year}-${mStr}-15`, end: `${year}-${mStr}-21` },
+    { id: 'w4', label: `Semana 4 (${monthShortName} 22 - ${monthShortName} 28)`, start: `${year}-${mStr}-22`, end: `${year}-${mStr}-28` },
+  ];
+
+  if (daysInMonth > 28) {
+    weeks.push({
+      id: 'w5',
+      label: `Semana 5 (${monthShortName} 29 - ${monthShortName} ${String(daysInMonth).padStart(2, '0')})`,
+      start: `${year}-${mStr}-29`,
+      end: `${year}-${mStr}-${String(daysInMonth).padStart(2, '0')}`
+    });
+  }
+
+  return weeks;
+};
 
 export default function RoadmapView({
   tasks,
@@ -32,6 +51,7 @@ export default function RoadmapView({
   selectedStatus,
   selectedPriority,
 }: RoadmapViewProps) {
+  const weeks = getWeeksOfCurrentMonth();
   // Configuración de la agrupación del Roadmap: 'company' o 'type'
   const [groupBy, setGroupBy] = useState<'company' | 'type'>('company');
 
@@ -95,7 +115,7 @@ export default function RoadmapView({
 
       {/* Weeks Grid Layout */}
       <div className="grid grid-cols-1 xl:grid-cols-5 gap-6">
-        {WEEKS_JULY_2026.map((week) => {
+        {weeks.map((week) => {
           const weekTasks = getTasksForWeek(week.start, week.end);
 
           // Agrupar las tareas de esta semana según la configuración

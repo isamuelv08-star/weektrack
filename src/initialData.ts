@@ -68,6 +68,13 @@ export const INITIAL_COMPANIES: Company[] = [
   },
 ];
 
+const getDynamicDate = (dayStr: string) => {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, '0');
+  return `${year}-${month}-${dayStr}`;
+};
+
 export const INITIAL_TASKS: Task[] = [
   {
     id: 't1',
@@ -75,8 +82,8 @@ export const INITIAL_TASKS: Task[] = [
     title: 'Plan de Contenidos - Instagram & Facebook',
     description: 'Estructurar la parrilla de contenidos mensual bajo la metodología Growth Scaling, enfocada en enganchar leads y educar sobre seguridad vial.',
     type: 'Contenido',
-    startDate: '2026-07-02',
-    endDate: '2026-07-10',
+    startDate: getDynamicDate('02'),
+    endDate: getDynamicDate('10'),
     status: 'Completado',
     priority: 'Alta',
     checklist: [
@@ -93,8 +100,8 @@ export const INITIAL_TASKS: Task[] = [
     title: 'Estructura Campaña Google Ads (Llantas de Invierno)',
     description: 'Lanzamiento de campaña de búsqueda de Google Ads enfocada en conversión directa para tiendas locales de neumáticos.',
     type: 'Pauta',
-    startDate: '2026-07-10',
-    endDate: '2026-07-18',
+    startDate: getDynamicDate('10'),
+    endDate: getDynamicDate('18'),
     status: 'En proceso',
     priority: 'Alta',
     checklist: [
@@ -111,8 +118,8 @@ export const INITIAL_TASKS: Task[] = [
     title: 'Flujo de Email Marketing Automatizado (Bienvenida)',
     description: 'Diseñar e implementar la secuencia de correos automáticos para nuevos prospectos que se registran en los webinars gratuitos de CERFIK.',
     type: 'CRM',
-    startDate: '2026-07-06',
-    endDate: '2026-07-13',
+    startDate: getDynamicDate('06'),
+    endDate: getDynamicDate('13'),
     status: 'En revisión',
     priority: 'Media',
     checklist: [
@@ -129,8 +136,8 @@ export const INITIAL_TASKS: Task[] = [
     title: 'Reunión de Resultados de Campaña Q2',
     description: 'Sesión estratégica por Zoom para presentar el informe de conversiones, costo por lead (CPL) y retorno de inversión en pauta educativa.',
     type: 'Reunión',
-    startDate: '2026-07-13',
-    endDate: '2026-07-13',
+    startDate: getDynamicDate('13'),
+    endDate: getDynamicDate('13'),
     status: 'Por hacer',
     priority: 'Alta',
     checklist: [
@@ -146,8 +153,8 @@ export const INITIAL_TASKS: Task[] = [
     title: 'Auditoría SEO Técnica & On-Page',
     description: 'Revisión exhaustiva del sitio web de Tecnidiesel Pasquel para detectar enlaces rotos, velocidad lenta y optimizar las palabras clave locales.',
     type: 'Entrega',
-    startDate: '2026-07-15',
-    endDate: '2026-07-22',
+    startDate: getDynamicDate('15'),
+    endDate: getDynamicDate('22'),
     status: 'Por hacer',
     priority: 'Alta',
     checklist: [
@@ -164,8 +171,8 @@ export const INITIAL_TASKS: Task[] = [
     title: 'Reporte Quincenal de Rendimiento de Pauta',
     description: 'Revisión de métricas de Facebook Ads de la quincena. Ajustes de pujas, públicos y exclusión de leads no calificados.',
     type: 'Administrativo',
-    startDate: '2026-07-14',
-    endDate: '2026-07-16',
+    startDate: getDynamicDate('14'),
+    endDate: getDynamicDate('16'),
     status: 'Por hacer',
     priority: 'Media',
     checklist: [],
@@ -177,8 +184,8 @@ export const INITIAL_TASKS: Task[] = [
     title: 'Optimización de Landing Page de Curso de Growth Scaling',
     description: 'Implementar mejoras de copywriting y diseño basadas en mapas de calor para aumentar la conversión de visitas a prospectos registrados.',
     type: 'Entrega',
-    startDate: '2026-07-01',
-    endDate: '2026-07-06',
+    startDate: getDynamicDate('01'),
+    endDate: getDynamicDate('06'),
     status: 'Completado',
     priority: 'Alta',
     checklist: [
@@ -194,8 +201,8 @@ export const INITIAL_TASKS: Task[] = [
     title: 'Diseño de Piezas Gráficas para Campaña de Liquidación',
     description: 'Creación de recursos visuales y adaptaciones de tamaño (feed, stories, horizontal) para la campaña relámpago de liquidación de stock de neumáticos.',
     type: 'Contenido',
-    startDate: '2026-07-20',
-    endDate: '2026-07-25',
+    startDate: getDynamicDate('20'),
+    endDate: getDynamicDate('25'),
     status: 'Por hacer',
     priority: 'Baja',
     checklist: [
@@ -210,8 +217,8 @@ export const INITIAL_TASKS: Task[] = [
     title: 'Configuración de Pixel de Conversión de TikTok',
     description: 'Instalación y testeo de eventos del Pixel de TikTok en el sitio de admisiones para medir registros directos provenientes de campañas de video corto.',
     type: 'Pauta',
-    startDate: '2026-07-05',
-    endDate: '2026-07-08',
+    startDate: getDynamicDate('05'),
+    endDate: getDynamicDate('08'),
     status: 'Completado',
     priority: 'Media',
     checklist: [
