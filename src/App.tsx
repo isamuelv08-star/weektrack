@@ -1167,8 +1167,18 @@ export default function App() {
                 </div>
               )}
 
-              {/* Crear Tarea */}
-              {activeUserRole !== 'Cliente' && null}
+              {/* Botón de Coeditores */}
+              <button
+                type="button"
+                onClick={() => setIsCoeditorsModalOpen(true)}
+                className="flex items-center bg-slate-100 hover:bg-slate-200/80 border border-slate-200/60 rounded-xl px-3 py-1.5 gap-2 shadow-xs text-xs font-bold text-slate-700 transition-all cursor-pointer select-none"
+              >
+                <Shield className="w-3.5 h-3.5 text-indigo-500" />
+                <span>Coeditores</span>
+                {activeUserRole === 'Admin' && accessRequests.some(r => r.status === 'pending') && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
+                )}
+              </button>
             </div>
 
           </div>
@@ -2162,37 +2172,8 @@ export default function App() {
         onRejectRequest={(id) => setAccessRequests(prev => prev.map(r => r.id === id ? { ...r, status: 'rejected' } : r))}
       />
 
-      {/* --- BOTONES FLOTANTES MODERNOS --- */}
-      <div className="fixed bottom-6 right-6 z-40 flex flex-col sm:flex-row items-center gap-3">
-        {/* Botón Flotante: Clientes (Solo Admin) */}
-        {activeUserRole === 'Admin' && (
-          <motion.button
-            whileHover={{ scale: 1.05, y: -2 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={() => setIsCompanyModalOpen(true)}
-            title="Administrar Clientes"
-            className="flex items-center gap-2 bg-white text-slate-700 hover:text-blue-600 border border-slate-200/80 px-4 py-3 rounded-2xl shadow-xl hover:shadow-blue-500/5 transition-all font-extrabold text-xs cursor-pointer select-none"
-          >
-            <Users className="w-4 h-4 text-blue-500" />
-            <span>Clientes</span>
-          </motion.button>
-        )}
-
-        {/* Botón Flotante: Coeditores */}
-        <motion.button
-          whileHover={{ scale: 1.05, y: -2 }}
-          whileTap={{ scale: 0.95 }}
-          onClick={() => setIsCoeditorsModalOpen(true)}
-          title="Gestionar Coeditores e Invitaciones"
-          className="flex items-center gap-2 bg-white text-slate-700 hover:text-indigo-600 border border-slate-200/80 px-4 py-3 rounded-2xl shadow-xl hover:shadow-indigo-500/5 transition-all font-extrabold text-xs cursor-pointer select-none"
-        >
-          <Shield className="w-4 h-4 text-indigo-500" />
-          <span>Coeditores</span>
-          {activeUserRole === 'Admin' && accessRequests.some(r => r.status === 'pending') && (
-            <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
-          )}
-        </motion.button>
-
+      {/* --- BOTÓN FLOTANTE MODERNIZADO --- */}
+      <div className="fixed bottom-6 right-6 z-40">
         {/* Botón Flotante: Nueva Tarea (Solo si no es Cliente) */}
         {activeUserRole !== 'Cliente' && (
           <motion.button
@@ -2200,10 +2181,10 @@ export default function App() {
             whileTap={{ scale: 0.95 }}
             onClick={() => handleNewTask()}
             title="Registrar Nueva Tarea"
-            className="flex items-center gap-2 text-white px-5 py-3.5 rounded-2xl shadow-xl shadow-blue-500/20 hover:brightness-105 transition-all font-extrabold text-xs cursor-pointer select-none"
+            className="flex items-center gap-2 text-white px-5 py-3.5 rounded-2xl shadow-xl shadow-blue-500/25 hover:brightness-105 transition-all font-extrabold text-xs cursor-pointer select-none"
             style={{ backgroundColor: appColor }}
           >
-            <Plus className="w-4 h-4" />
+            <Plus className="w-4.5 h-4.5" />
             <span>Nueva Tarea</span>
           </motion.button>
         )}
