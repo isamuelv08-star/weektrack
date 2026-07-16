@@ -925,7 +925,7 @@ export default function App() {
       <div className="flex-1 flex flex-col min-w-0 overflow-y-auto h-full max-h-screen bg-slate-50">
         
         {/* Header Superior */}
-        <header className="bg-white border-b border-slate-150 px-6 py-4 sticky top-0 z-40 shadow-xs flex-shrink-0">
+        <header className="bg-slate-50 px-6 py-6 sticky top-0 z-40 flex-shrink-0">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             
             {/* Bienvenido/a personalizado */}
@@ -938,18 +938,15 @@ export default function App() {
               </button>
               <div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <h1 className="text-base sm:text-lg font-black text-slate-800 tracking-tight leading-none">
+                  <h1 className="text-xl sm:text-2xl md:text-3xl font-black text-slate-800 tracking-tight leading-tight">
                     {activeUserRole === 'Admin' ? (
-                      <>¡Bienvenido, Samuel! 👋</>
+                      <>¡Bienvenido, <span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600">Samuel</span>! 👋</>
                     ) : (
-                      <>¡Hola, {activeUserName.split(' ')[0]}! 👋</>
+                      <>¡Hola, <span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600">{activeUserName.split(' ')[0]}</span>! 👋</>
                     )}
                   </h1>
-                  <span className="text-[9px] bg-blue-50 text-blue-600 border border-blue-100 px-2 py-0.5 rounded-full font-black uppercase tracking-wider">
-                    {activeUserRole === 'Admin' ? 'Administrador' : activeUserRole}
-                  </span>
                 </div>
-                <p className="text-xs text-slate-500 font-medium mt-1">
+                <p className="text-xs sm:text-sm text-slate-500 font-medium mt-1">
                   {activeUserRole === 'Admin' ? (
                     'Qué gusto saludarte. Revisa tus pendientes y el cronograma para hoy...'
                   ) : activeUserRole === 'Equipo' ? (
