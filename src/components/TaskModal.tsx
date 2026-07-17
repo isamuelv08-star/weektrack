@@ -39,6 +39,57 @@ export const PRIORITY_COLORS: Record<TaskPriority, string> = {
   Baja: 'text-emerald-700 bg-emerald-50/50 border-emerald-200/80',
 };
 
+export const CHECKLIST_SUGGESTIONS: Record<TaskType, string[]> = {
+  Contenido: [
+    'Redactar copy y hashtags',
+    'Diseño de artes gráficos',
+    'Grabar reels o videos',
+    'Aprobación del cliente',
+    'Programar publicación',
+  ],
+  Pauta: [
+    'Definir público objetivo',
+    'Configurar campaña en Ads Manager',
+    'Diseño de creativos y banners',
+    'Instalación y prueba de Pixel',
+    'Revisar presupuesto diario',
+  ],
+  CRM: [
+    'Redactar secuencia de correos',
+    'Diseñar plantilla HTML',
+    'Segmentar base de datos',
+    'Prueba de envío de test',
+    'Activar automatización',
+  ],
+  Reunión: [
+    'Definir agenda y objetivos',
+    'Enviar invitación con link',
+    'Preparar presentación / diapositivas',
+    'Tomar minuta y acuerdos',
+    'Enviar correo de seguimiento',
+  ],
+  Entrega: [
+    'Revisión final de calidad',
+    'Exportar entregables (Drive/ZIP)',
+    'Redactar nota de entrega',
+    'Enviar link de entrega',
+    'Recibir feedback del cliente',
+  ],
+  Administrativo: [
+    'Actualizar reporte de horas',
+    'Enviar factura o recibo',
+    'Archivar documentación',
+    'Revisar métricas de la semana',
+    'Planificar próxima semana',
+  ],
+  Otro: [
+    'Investigación previa',
+    'Reunión de alineación interna',
+    'Ajustar calendario',
+    'Revisión de competidores',
+  ],
+};
+
 export default function TaskModal({
   isOpen,
   onClose,
@@ -422,15 +473,32 @@ export default function TaskModal({
 
                     {/* Add Subtask Form */}
                     {activeUserRole !== 'Cliente' && (
-                      <div className="flex gap-2">
-                        <input
-                          type="text"
-                          value={newSubTaskText}
-                          onChange={(e) => setNewSubTaskText(e.target.value)}
-                          placeholder="Nueva subtarea (ej: Redactar copys)..."
-                          className="flex-1 px-3 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-hidden focus:ring-1 focus:ring-blue-500 bg-white"
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
+                      <div className="space-y-2.5">
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            value={newSubTaskText}
+                            onChange={(e) => setNewSubTaskText(e.target.value)}
+                            placeholder="Nueva subtarea (ej: Redactar copys)..."
+                            className="flex-1 px-3 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-hidden focus:ring-1 focus:ring-blue-500 bg-white"
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                if (newSubTaskText.trim()) {
+                                  const newSub: SubTask = {
+                                    id: `sub-${Date.now()}`,
+                                    text: newSubTaskText.trim(),
+                                    completed: false,
+                                  };
+                                  setChecklist([...checklist, newSub]);
+                                  setNewSubTaskText('');
+                                }
+                              }
+                            }}
+                          />
+                          <button
+                            type="button"
+                            onClick={(e) => {
                               e.preventDefault();
                               if (newSubTaskText.trim()) {
                                 const newSub: SubTask = {
@@ -441,27 +509,49 @@ export default function TaskModal({
                                 setChecklist([...checklist, newSub]);
                                 setNewSubTaskText('');
                               }
-                            }
-                          }}
-                        />
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            if (newSubTaskText.trim()) {
-                              const newSub: SubTask = {
-                                id: `sub-${Date.now()}`,
-                                text: newSubTaskText.trim(),
-                                completed: false,
-                              };
-                              setChecklist([...checklist, newSub]);
-                              setNewSubTaskText('');
-                            }
-                          }}
-                          className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
-                        >
-                          <Plus className="w-3 h-3" /> Agregar
-                        </button>
+                            }}
+                            className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
+                          >
+                            <Plus className="w-3 h-3" /> Agregar
+                          </button>
+                        </div>
+
+                        {/* Suggestions Area */}
+                        <div>
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">
+                            Sugerencias rápidas de {type}:
+                          </span>
+                          <div className="flex flex-wrap gap-1.5">
+                            {CHECKLIST_SUGGESTIONS[type]?.map((item, idx) => {
+                              const isAlreadyAdded = checklist.some(
+                                (sub) => sub.text.toLowerCase().trim() === item.toLowerCase().trim()
+                              );
+                              return (
+                                <button
+                                  key={idx}
+                                  type="button"
+                                  disabled={isAlreadyAdded}
+                                  onClick={() => {
+                                    const newSub: SubTask = {
+                                      id: `sub-${Date.now()}-${idx}`,
+                                      text: item,
+                                      completed: false,
+                                    };
+                                    setChecklist([...checklist, newSub]);
+                                  }}
+                                  className={`px-2 py-1 rounded-lg text-[10px] font-bold border transition-all cursor-pointer select-none active:scale-95 ${
+                                    isAlreadyAdded
+                                      ? 'bg-slate-50 text-slate-300 border-slate-100 cursor-not-allowed line-through'
+                                      : 'bg-blue-50/50 hover:bg-blue-50 text-blue-600 border-blue-100 hover:border-blue-200'
+                                  }`}
+                                >
+                                  {isAlreadyAdded ? '✓ ' : '+ '}
+                                  {item}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
                       </div>
                     )}
                   </div>
