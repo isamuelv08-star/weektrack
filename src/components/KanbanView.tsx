@@ -21,6 +21,7 @@ const COLUMNS: { id: TaskStatus; label: string; bg: string; border: string; text
   { id: 'En revisión', label: 'En revisión', bg: 'bg-indigo-50/20', border: 'border-indigo-200/50', text: 'text-indigo-700' },
   { id: 'Completado', label: 'Completado', bg: 'bg-emerald-50/20', border: 'border-emerald-200/50', text: 'text-emerald-700' },
   { id: 'Bloqueado', label: 'Bloqueado', bg: 'bg-rose-50/20', border: 'border-rose-200/50', text: 'text-rose-700' },
+  { id: 'No se hizo', label: 'No se hizo', bg: 'bg-zinc-100/40', border: 'border-zinc-300/50', text: 'text-zinc-600' },
 ];
 
 export default function KanbanView({
@@ -66,7 +67,7 @@ export default function KanbanView({
 
   // Mover de estado con botones de flecha (accesibilidad y móvil)
   const shiftStatus = (taskId: string, currentStatus: TaskStatus, direction: 'prev' | 'next') => {
-    const statusOrder: TaskStatus[] = ['Por hacer', 'En proceso', 'En revisión', 'Completado', 'Bloqueado'];
+    const statusOrder: TaskStatus[] = ['Por hacer', 'En proceso', 'En revisión', 'Completado', 'Bloqueado', 'No se hizo'];
     const idx = statusOrder.indexOf(currentStatus);
     let nextIdx = idx + (direction === 'next' ? 1 : -1);
     if (nextIdx >= 0 && nextIdx < statusOrder.length) {
@@ -75,7 +76,7 @@ export default function KanbanView({
   };
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-5 gap-4 overflow-x-auto min-h-[65vh] pb-4 select-none" id="kanban-view-container">
+    <div className="grid grid-cols-1 md:grid-cols-6 gap-4 overflow-x-auto min-h-[65vh] pb-4 select-none" id="kanban-view-container">
       {COLUMNS.map((col) => {
         const colTasks = filteredTasks.filter((t) => t.status === col.id);
 

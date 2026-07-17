@@ -1,4 +1,4 @@
-export type TaskStatus = 'Por hacer' | 'En proceso' | 'En revisión' | 'Completado' | 'Bloqueado';
+export type TaskStatus = 'Por hacer' | 'En proceso' | 'En revisión' | 'Completado' | 'Bloqueado' | 'No se hizo';
 export type TaskPriority = 'Alta' | 'Media' | 'Baja';
 export type TaskType = 'Contenido' | 'Pauta' | 'CRM' | 'Reunión' | 'Entrega' | 'Administrativo' | 'Otro';
 

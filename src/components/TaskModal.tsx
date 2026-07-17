@@ -24,7 +24,7 @@ interface TaskModalProps {
 }
 
 const TASK_TYPES: TaskType[] = ['Contenido', 'Pauta', 'CRM', 'Reunión', 'Entrega', 'Administrativo', 'Otro'];
-const TASK_STATUSES: TaskStatus[] = ['Por hacer', 'En proceso', 'En revisión', 'Completado', 'Bloqueado'];
+const TASK_STATUSES: TaskStatus[] = ['Por hacer', 'En proceso', 'En revisión', 'Completado', 'Bloqueado', 'No se hizo'];
 const TASK_PRIORITIES: TaskPriority[] = ['Alta', 'Media', 'Baja'];
 
 export const TYPE_COLORS: Record<TaskType, string> = {

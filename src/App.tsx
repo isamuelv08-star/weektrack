@@ -959,8 +959,8 @@ export default function App() {
   const totalTasks = clientFilteredTasks.length;
   const completedTasks = clientFilteredTasks.filter((t) => t.status === 'Completado').length;
   const inProgressTasks = clientFilteredTasks.filter((t) => t.status === 'En proceso' || t.status === 'En revisión').length;
-  const pendingTasks = clientFilteredTasks.filter((t) => t.status !== 'Completado' && t.status !== 'Bloqueado').length;
-  const blockedTasks = clientFilteredTasks.filter((t) => t.status === 'Bloqueado').length;
+  const pendingTasks = clientFilteredTasks.filter((t) => t.status !== 'Completado' && t.status !== 'Bloqueado' && t.status !== 'No se hizo').length;
+  const blockedTasks = clientFilteredTasks.filter((t) => t.status === 'Bloqueado' || t.status === 'No se hizo').length;
   const progressRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
   // Estado para pre-establecer la fecha de una tarea
@@ -2259,6 +2259,7 @@ export default function App() {
                       <option value="En revisión">En revisión</option>
                       <option value="Completado">Completado</option>
                       <option value="Bloqueado">Bloqueado</option>
+                      <option value="No se hizo">No se hizo</option>
                     </select>
 
                     {/* Filtro por Prioridad */}

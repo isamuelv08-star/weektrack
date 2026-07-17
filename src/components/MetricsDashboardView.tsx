@@ -25,7 +25,8 @@ import {
   Activity, 
   ArrowUpRight,
   Sparkles,
-  Award
+  Award,
+  XCircle
 } from 'lucide-react';
 
 interface MetricsDashboardViewProps {
@@ -70,6 +71,7 @@ export default function MetricsDashboardView({
     const inProgress = filteredTasks.filter((t) => t.status === 'En proceso' || t.status === 'En revisión').length;
     const pending = filteredTasks.filter((t) => t.status === 'Por hacer').length;
     const blocked = filteredTasks.filter((t) => t.status === 'Bloqueado').length;
+    const notDone = filteredTasks.filter((t) => t.status === 'No se hizo').length;
 
     // Calcular tasa de cumplimiento a tiempo
     // Simulamos que una tarea está "A tiempo" si se completó y su fecha límite no ha pasado,
@@ -93,7 +95,7 @@ export default function MetricsDashboardView({
         } else {
           completedOnTime++;
         }
-      } else {
+      } else if (t.status !== 'No se hizo') {
         if (isOverdue) {
           pendingOverdue++;
         } else {
@@ -111,6 +113,7 @@ export default function MetricsDashboardView({
       inProgress,
       pending,
       blocked,
+      notDone,
       completedOnTime,
       completedLate,
       pendingOnTime,
@@ -121,23 +124,25 @@ export default function MetricsDashboardView({
 
   // 3. Datos para Gráfico: Cantidad de tareas por Cliente
   const tasksByClientData = useMemo(() => {
-    const dataMap: { [key: string]: { name: string; completadas: number; pendientes: number; total: number } } = {};
+    const dataMap: { [key: string]: { name: string; completadas: number; pendientes: number; noRealizadas: number; total: number } } = {};
 
     // Inicializar con las empresas activas
     companies.forEach((c) => {
-      dataMap[c.id] = { name: c.name, completadas: 0, pendientes: 0, total: 0 };
+      dataMap[c.id] = { name: c.name, completadas: 0, pendientes: 0, noRealizadas: 0, total: 0 };
     });
 
     filteredTasks.forEach((t) => {
       if (!dataMap[t.companyId]) {
         // Si por alguna razón la empresa no está en la lista de filtradas, buscarla en la lista original
         const comp = companies.find((c) => c.id === t.companyId);
-        dataMap[t.companyId] = { name: comp ? comp.name : 'Desconocido', completadas: 0, pendientes: 0, total: 0 };
+        dataMap[t.companyId] = { name: comp ? comp.name : 'Desconocido', completadas: 0, pendientes: 0, noRealizadas: 0, total: 0 };
       }
 
       dataMap[t.companyId].total++;
       if (t.status === 'Completado') {
         dataMap[t.companyId].completadas++;
+      } else if (t.status === 'No se hizo') {
+        dataMap[t.companyId].noRealizadas++;
       } else {
         dataMap[t.companyId].pendientes++;
       }
@@ -218,7 +223,7 @@ export default function MetricsDashboardView({
       </div>
 
       {/* Tarjetas de Métricas de Alto Impacto */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5">
         {/* Card 1: Tasa de Cumplimiento */}
         <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs flex items-center justify-between relative overflow-hidden">
           <div className="absolute top-0 left-0 w-1.5 h-full bg-emerald-500 rounded-l-2xl" />
@@ -296,6 +301,24 @@ export default function MetricsDashboardView({
             <AlertTriangle className="w-5 h-5" />
           </div>
         </div>
+
+        {/* Card 5: No Realizadas */}
+        <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs flex items-center justify-between relative overflow-hidden">
+          <div className="absolute top-0 left-0 w-1.5 h-full bg-zinc-500 rounded-l-2xl" />
+          <div className="space-y-2">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">No Realizadas / Descartadas</span>
+            <div className="flex items-baseline gap-2">
+              <span className="text-3xl font-extrabold text-slate-900">{stats.notDone}</span>
+              <span className="text-[10px] text-zinc-600 font-extrabold bg-zinc-100 px-2 py-0.5 rounded-full">Reportadas</span>
+            </div>
+            <p className="text-[10px] text-slate-500 font-medium">
+              Hitos planificados que no se completaron
+            </p>
+          </div>
+          <div className="p-3 bg-zinc-100 text-zinc-600 rounded-xl">
+            <XCircle className="w-5 h-5" />
+          </div>
+        </div>
       </div>
 
       {/* Gráficos Principales */}
@@ -348,6 +371,7 @@ export default function MetricsDashboardView({
                   />
                   <Bar dataKey="completadas" name="Completadas" fill="#10b981" radius={[4, 4, 0, 0]} />
                   <Bar dataKey="pendientes" name="Pendientes" fill="#eab308" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="noRealizadas" name="No Realizadas" fill="#71717a" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>

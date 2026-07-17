@@ -41,8 +41,9 @@ export default function ReportModal({ isOpen, onClose, tasks, companies }: Repor
   const totalTasks = filteredTasks.length;
   const completedTasks = filteredTasks.filter((t) => t.status === 'Completado');
   const completedCount = completedTasks.length;
-  const pendingTasks = filteredTasks.filter((t) => t.status !== 'Completado' && t.status !== 'Bloqueado');
+  const pendingTasks = filteredTasks.filter((t) => t.status !== 'Completado' && t.status !== 'Bloqueado' && t.status !== 'No se hizo');
   const blockedTasks = filteredTasks.filter((t) => t.status === 'Bloqueado');
+  const notDoneTasks = filteredTasks.filter((t) => t.status === 'No se hizo');
   
   // Calcular % de cumplimiento
   const complianceRate = totalTasks > 0 ? Math.round((completedCount / totalTasks) * 100) : 0;
@@ -70,7 +71,8 @@ export default function ReportModal({ isOpen, onClose, tasks, companies }: Repor
     reportText += `• Tareas Completadas: ${completedCount}\n`;
     reportText += `• Cumplimiento General: ${complianceRate}%\n`;
     reportText += `• Tareas Pendientes/En Curso: ${pendingTasks.length}\n`;
-    reportText += `• Tareas Bloqueadas: ${blockedTasks.length}\n\n`;
+    reportText += `• Tareas Bloqueadas: ${blockedTasks.length}\n`;
+    reportText += `• Tareas No Realizadas: ${notDoneTasks.length}\n\n`;
 
     reportText += `*DESGLOSE POR ENTREGABLE:*\n`;
     Object.entries(typeStats).forEach(([type, count]) => {
@@ -92,6 +94,15 @@ export default function ReportModal({ isOpen, onClose, tasks, companies }: Repor
         }
         reportText += `\n`;
       });
+    }
+
+    if (notDoneTasks.length > 0) {
+      reportText += `*HITOS NO REALIZADOS:*\n`;
+      notDoneTasks.forEach((t, i) => {
+        const comp = companies.find(c => c.id === t.companyId)?.name || 'Cliente';
+        reportText += `${i + 1}. [${comp}] *${t.title}*\n`;
+      });
+      reportText += `\n`;
     }
 
     reportText += `----------------------------------------------\n`;
@@ -331,24 +342,24 @@ export default function ReportModal({ isOpen, onClose, tasks, companies }: Repor
                     )}
                   </div>
 
-                  {/* Pending/Locked Tasks Section */}
-                  {(pendingTasks.length > 0 || blockedTasks.length > 0) && (
+                  {/* Pending/Locked/Not Done Tasks Section */}
+                  {(pendingTasks.length > 0 || blockedTasks.length > 0 || notDoneTasks.length > 0) && (
                     <div>
                       <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3.5 border-b pb-1.5">
-                        Tareas Pendientes o en Seguimiento ({pendingTasks.length + blockedTasks.length})
+                        Tareas Pendientes, Bloqueadas o No Realizadas ({pendingTasks.length + blockedTasks.length + notDoneTasks.length})
                       </h3>
                       <div className="space-y-2">
-                        {[...pendingTasks, ...blockedTasks].map((t) => (
+                        {[...pendingTasks, ...blockedTasks, ...notDoneTasks].map((t) => (
                           <div key={t.id} className="flex justify-between items-center p-3 border border-slate-100 rounded-lg text-xs">
                             <div className="flex items-center gap-2">
-                              <span className={`w-2 h-2 rounded-full ${t.status === 'Bloqueado' ? 'bg-red-500 animate-pulse' : 'bg-orange-400'}`} />
-                              <span className="font-semibold text-slate-700">{t.title}</span>
+                              <span className={`w-2 h-2 rounded-full ${t.status === 'Bloqueado' ? 'bg-rose-500 animate-pulse' : t.status === 'No se hizo' ? 'bg-zinc-400' : 'bg-orange-400'}`} />
+                              <span className={`font-semibold ${t.status === 'No se hizo' ? 'text-slate-400 line-through decoration-slate-300' : 'text-slate-700'}`}>{t.title}</span>
                             </div>
                             <div className="flex gap-2">
                               <span className="text-[9px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded-sm">
                                 {t.type}
                               </span>
-                              <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-sm ${t.status === 'Bloqueado' ? 'bg-red-100 text-red-800' : 'bg-orange-100'}`}>
+                              <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-sm ${t.status === 'Bloqueado' ? 'bg-rose-100 text-rose-800' : t.status === 'No se hizo' ? 'bg-zinc-150 text-zinc-600' : 'bg-orange-100'}`}>
                                 {t.status}
                               </span>
                             </div>

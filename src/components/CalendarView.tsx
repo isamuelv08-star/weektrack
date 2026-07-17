@@ -237,6 +237,11 @@ export default function CalendarView({
                     bgStyle = '#fffbeb'; // Yellow/amber
                     borderStyle = '#f59e0b';
                     textStyle = '#b45309';
+                  } else if (task.status === 'No se hizo') {
+                    bgStyle = '#f4f4f5'; // Light zinc/grey
+                    borderStyle = '#a1a1aa'; // Zinc border
+                    textStyle = '#71717a'; // Zinc text
+                    decorationStyle = 'line-through opacity-60';
                   }
 
                   // Dynamic priority dot styles

@@ -193,6 +193,8 @@ export default function RoadmapView({
                                   ? 'bg-emerald-50 text-emerald-600'
                                   : t.status === 'Bloqueado'
                                   ? 'bg-rose-50 text-rose-600 animate-pulse'
+                                  : t.status === 'No se hizo'
+                                  ? 'bg-zinc-100 text-zinc-500'
                                   : 'bg-slate-100 text-slate-600'
                               }`}>
                                 {t.status}
