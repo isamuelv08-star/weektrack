@@ -19,6 +19,8 @@ import CalendarView from './components/CalendarView';
 import KanbanView from './components/KanbanView';
 import RoadmapView from './components/RoadmapView';
 import TimelineView from './components/TimelineView';
+import MetricsDashboardView from './components/MetricsDashboardView';
+import AuditLogView, { ActivityLog } from './components/AuditLogView';
 
 // Iconos
 import {
@@ -113,7 +115,7 @@ export default function App() {
   });
 
   // --- FILTROS Y NAVEGACIÓN ---
-  const [activeTab, setActiveTab] = useState<'calendario' | 'kanban' | 'roadmap' | 'timeline' | 'colaboracion'>('calendario');
+  const [activeTab, setActiveTab] = useState<'calendario' | 'kanban' | 'roadmap' | 'timeline' | 'colaboracion' | 'metricas' | 'auditoria'>('calendario');
   const [restrictedCompanyId, setRestrictedCompanyId] = useState<string | null>(() => {
     const params = new URLSearchParams(window.location.search);
     const roleParam = params.get('role');
@@ -228,6 +230,61 @@ export default function App() {
     '👁️ [10:16 AM] Sofía Pasquel (Gerente de Mundillantas) está visualizando el Gantt.',
   ]);
 
+  const [activities, setActivities] = useState<ActivityLog[]>(() => {
+    const local = localStorage.getItem('wt_activities');
+    if (local) {
+      try {
+        return JSON.parse(local);
+      } catch (e) {
+        console.error('Error parsing activities', e);
+      }
+    }
+    // Seed with realistic initial activities
+    const now = new Date();
+    return [
+      {
+        id: 'act-init-1',
+        taskId: 'task-1',
+        taskTitle: 'Plan de Contenidos - Instagram & Facebook',
+        action: 'create',
+        userName: 'Samuel V. (iGenius)',
+        userRole: 'Admin',
+        timestamp: new Date(now.getTime() - 3600000 * 48).toISOString() // 2 days ago
+      },
+      {
+        id: 'act-init-2',
+        taskId: 'task-1',
+        taskTitle: 'Plan de Contenidos - Instagram & Facebook',
+        action: 'status_change',
+        oldValue: 'Por hacer',
+        newValue: 'Completado',
+        userName: 'Sofía Pasquel (Gerente)',
+        userRole: 'Cliente',
+        timestamp: new Date(now.getTime() - 3600000 * 24).toISOString() // 1 day ago
+      },
+      {
+        id: 'act-init-3',
+        taskId: 'task-2',
+        taskTitle: 'Estructura Campaña Google Ads (Llantas de Invierno)',
+        action: 'create',
+        userName: 'Samuel V. (iGenius)',
+        userRole: 'Admin',
+        timestamp: new Date(now.getTime() - 3600000 * 12).toISOString() // 12 hours ago
+      },
+      {
+        id: 'act-init-4',
+        taskId: 'task-2',
+        taskTitle: 'Estructura Campaña Google Ads (Llantas de Invierno)',
+        action: 'status_change',
+        oldValue: 'Por hacer',
+        newValue: 'En proceso',
+        userName: 'Carlos Gómez (Diseño)',
+        userRole: 'Equipo',
+        timestamp: new Date(now.getTime() - 3600000 * 2).toISOString() // 2 hours ago
+      }
+    ];
+  });
+
   // Al montar, configurar motor de eventos interactivos de simulación
   useEffect(() => {
     const events = [
@@ -318,6 +375,11 @@ export default function App() {
     localStorage.setItem('wt_access_requests', JSON.stringify(accessRequests));
   }, [accessRequests]);
 
+  // Guardar actividades de auditoría en localStorage
+  useEffect(() => {
+    localStorage.setItem('wt_activities', JSON.stringify(activities));
+  }, [activities]);
+
   // Escuchar cambios de localStorage en tiempo real para sincronización multipestaña (Event + Polling)
   useEffect(() => {
     const handleStorageChange = (e: StorageEvent) => {
@@ -336,6 +398,11 @@ export default function App() {
           setAccessRequests(JSON.parse(e.newValue));
         } catch (err) {}
       }
+      if (e.key === 'wt_activities' && e.newValue) {
+        try {
+          setActivities(JSON.parse(e.newValue));
+        } catch (err) {}
+      }
     };
     window.addEventListener('storage', handleStorageChange);
 
@@ -343,11 +410,13 @@ export default function App() {
     let lastTasksStr = localStorage.getItem('cronograma_tasks') || '[]';
     let lastCompaniesStr = localStorage.getItem('cronograma_companies') || '[]';
     let lastRequestsStr = localStorage.getItem('wt_access_requests') || '[]';
+    let lastActivitiesStr = localStorage.getItem('wt_activities') || '[]';
 
     const interval = setInterval(() => {
       const storedTasksStr = localStorage.getItem('cronograma_tasks');
       const storedCompaniesStr = localStorage.getItem('cronograma_companies');
       const storedRequestsStr = localStorage.getItem('wt_access_requests');
+      const storedActivitiesStr = localStorage.getItem('wt_activities');
 
       if (storedTasksStr && storedTasksStr !== lastTasksStr) {
         try {
@@ -365,6 +434,12 @@ export default function App() {
         try {
           setAccessRequests(JSON.parse(storedRequestsStr));
           lastRequestsStr = storedRequestsStr;
+        } catch (err) {}
+      }
+      if (storedActivitiesStr && storedActivitiesStr !== lastActivitiesStr) {
+        try {
+          setActivities(JSON.parse(storedActivitiesStr));
+          lastActivitiesStr = storedActivitiesStr;
         } catch (err) {}
       }
     }, 1000);
@@ -433,6 +508,7 @@ export default function App() {
   // Verificar si la vista está permitida para el rol actual según la configuración de la empresa
   const isViewAllowed = (viewId: string) => {
     if (activeUserRole === 'Admin') return true;
+    if (viewId === 'metricas' || viewId === 'auditoria') return true;
     if (!restrictedCompanyId) return true;
     const currentCompany = companies.find(c => c.id === restrictedCompanyId);
     if (!currentCompany) return true;
@@ -595,6 +671,28 @@ export default function App() {
 
   // --- CRUD OPERACIONES ---
 
+  // Método auxiliar para registrar actividades en el historial
+  const logActivity = (
+    taskId: string,
+    taskTitle: string,
+    action: 'create' | 'edit' | 'delete' | 'status_change',
+    oldValue?: string,
+    newValue?: string
+  ) => {
+    const newLog: ActivityLog = {
+      id: `act-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      taskId,
+      taskTitle,
+      action,
+      oldValue,
+      newValue,
+      userName: activeUserName,
+      userRole: activeUserRole,
+      timestamp: new Date().toISOString()
+    };
+    setActivities((prev) => [newLog, ...prev]);
+  };
+
   // Agregar Empresa
   const handleAddCompany = (newComp: Omit<Company, 'id'>) => {
     const company: Company = {
@@ -625,10 +723,27 @@ export default function App() {
     }
     const exists = tasks.some((t) => t.id === savedTask.id);
     if (exists) {
+      const oldTask = tasks.find((t) => t.id === savedTask.id);
       setTasks(tasks.map((t) => (t.id === savedTask.id ? savedTask : t)));
+      
+      // Registrar en el historial de actividades
+      if (oldTask) {
+        if (oldTask.status !== savedTask.status) {
+          logActivity(savedTask.id, savedTask.title, 'status_change', oldTask.status, savedTask.status);
+        } else {
+          logActivity(savedTask.id, savedTask.title, 'edit');
+        }
+      } else {
+        logActivity(savedTask.id, savedTask.title, 'edit');
+      }
+
       showToast("¡Tarea actualizada con éxito!", "success");
     } else {
       setTasks([...tasks, savedTask]);
+      
+      // Registrar creación
+      logActivity(savedTask.id, savedTask.title, 'create');
+
       showToast("¡Tarea creada con éxito!", "success");
     }
   };
@@ -640,7 +755,14 @@ export default function App() {
       showAlert("Acceso restringido", "Tu solicitud de acceso como co-editor aún no ha sido aprobada por el Administrador.", "error");
       return;
     }
+    const taskToDelete = tasks.find((t) => t.id === id);
     setTasks(tasks.filter((t) => t.id !== id));
+    
+    // Registrar eliminación
+    if (taskToDelete) {
+      logActivity(id, taskToDelete.title, 'delete');
+    }
+
     showToast("¡Tarea eliminada con éxito!", "success");
   };
 
@@ -670,6 +792,12 @@ export default function App() {
       showAlert("Acceso de solo lectura", "Tu solicitud de acceso como co-editor aún no ha sido aprobada por el Administrador. Tienes acceso de solo lectura.", "warning");
       return;
     }
+
+    const taskToUpdate = tasks.find((t) => t.id === id);
+    if (taskToUpdate && taskToUpdate.status !== newStatus) {
+      logActivity(id, taskToUpdate.title, 'status_change', taskToUpdate.status, newStatus);
+    }
+
     setTasks(
       tasks.map((t) => {
         if (t.id === id) {
@@ -815,20 +943,52 @@ export default function App() {
           <button
             id="tab-planificacion"
             onClick={() => {
-              if (activeTab === 'colaboracion') {
+              if (activeTab === 'colaboracion' || activeTab === 'metricas' || activeTab === 'auditoria') {
                 setActiveTab('calendario');
               }
             }}
             className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer text-left ${
-              activeTab !== 'colaboracion'
+              activeTab !== 'colaboracion' && activeTab !== 'metricas' && activeTab !== 'auditoria'
                 ? 'text-white shadow-lg shadow-blue-600/10'
                 : 'text-slate-400 hover:bg-slate-800/50 hover:text-white'
             }`}
-            style={activeTab !== 'colaboracion' ? { backgroundColor: appColor } : {}}
+            style={activeTab !== 'colaboracion' && activeTab !== 'metricas' && activeTab !== 'auditoria' ? { backgroundColor: appColor } : {}}
           >
             <Calendar className="w-4 h-4 flex-shrink-0" />
             {isSidebarOpen && <span>Planificación</span>}
           </button>
+
+          {/* Métricas Avanzadas */}
+          {isViewAllowed('metricas') && (
+            <button
+              id="tab-metricas"
+              onClick={() => setActiveTab('metricas')}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer text-left ${
+                activeTab === 'metricas'
+                  ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/10'
+                  : 'text-slate-400 hover:bg-slate-800/50 hover:text-white'
+              }`}
+            >
+              <TrendingUp className="w-4 h-4 flex-shrink-0 text-blue-400" />
+              {isSidebarOpen && <span>Métricas Avanzadas</span>}
+            </button>
+          )}
+
+          {/* Auditoría de Cambios */}
+          {isViewAllowed('auditoria') && (
+            <button
+              id="tab-auditoria"
+              onClick={() => setActiveTab('auditoria')}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer text-left ${
+                activeTab === 'auditoria'
+                  ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/10'
+                  : 'text-slate-400 hover:bg-slate-800/50 hover:text-white'
+              }`}
+            >
+              <Clock className="w-4 h-4 flex-shrink-0 text-indigo-400" />
+              {isSidebarOpen && <span>Historial de Auditoría</span>}
+            </button>
+          )}
 
           {/* Colaboración & Chat */}
           {isViewAllowed('colaboracion') && (
@@ -1735,6 +1895,33 @@ export default function App() {
               </div>
 
             </div>
+
+          ) : activeTab === 'metricas' ? (
+            
+            /* --- VISTA DE MÉTRICAS AVANZADAS --- */
+            <MetricsDashboardView
+              tasks={tasks}
+              companies={companies}
+              selectedCompanyId={selectedCompanyId}
+            />
+
+          ) : activeTab === 'auditoria' ? (
+
+            /* --- VISTA DE AUDITORÍA DE CAMBIOS --- */
+            <AuditLogView
+              activities={activities}
+              companies={companies}
+              selectedCompanyId={selectedCompanyId}
+              onClearActivities={
+                activeUserRole === 'Admin'
+                  ? () => {
+                      setActivities([]);
+                      showToast("¡Historial de auditoría borrado con éxito!", "success");
+                    }
+                  : undefined
+              }
+              activeUserRole={activeUserRole}
+            />
 
           ) : (
             
