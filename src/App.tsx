@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Company, Task, TaskStatus, TaskPriority, TaskType, AccessRequest } from './types';
+import { Company, Task, TaskStatus, TaskPriority, TaskType, AccessRequest, TaskTemplate } from './types';
 import { INITIAL_COMPANIES, INITIAL_TASKS } from './initialData';
 import { useFeedback } from './components/FeedbackProvider';
 
@@ -285,6 +285,97 @@ export default function App() {
     ];
   });
 
+  const DEFAULT_TEMPLATES: TaskTemplate[] = [
+    {
+      id: 'tpl-1',
+      name: 'Campaña de Tráfico / Conversión (Meta Ads)',
+      description: 'Configuración completa para lanzar campañas en Facebook e Instagram Ads.',
+      titleTemplate: 'Pauta Ads - {Cliente}',
+      taskDescription: 'Configuración y optimización de pauta digital en canales de Meta para generar conversiones o tráfico calificado.',
+      type: 'Pauta',
+      priority: 'Media',
+      checklist: [
+        'Definir público objetivo y segmentaciones (intereses/LAL)',
+        'Diseño de creativos y copies promocionales',
+        'Configurar campaña en Facebook Ads Manager',
+        'Instalar y verificar Pixel / API de Conversiones',
+        'Cargar presupuesto diario y activar campaña',
+        'Primera revisión de optimización (a las 48 horas)'
+      ],
+      relativeDaysStart: 0,
+      relativeDaysEnd: 7
+    },
+    {
+      id: 'tpl-2',
+      name: 'Plan de Contenido Orgánico Mensual',
+      description: 'Estructuración, diseño y programación de contenido para redes sociales.',
+      titleTemplate: 'Contenido Mensual - {Cliente}',
+      taskDescription: 'Planificación de la parrilla de contenidos orgánicos para el mes entrante, incluyendo copies, hashtags y piezas de diseño.',
+      type: 'Contenido',
+      priority: 'Media',
+      checklist: [
+        'Análisis de rendimiento de publicaciones anteriores',
+        'Propuesta de pilares de contenido del mes',
+        'Redacción de copys, hashtags y CTAs estratégicos',
+        'Diseño de artes gráficos o infografías en Canva/Figma',
+        'Edición de reels o contenidos cortos de video',
+        'Enviar para aprobación formal del cliente',
+        'Programar contenidos aprobados en Meta Business Suite'
+      ],
+      relativeDaysStart: 0,
+      relativeDaysEnd: 15
+    },
+    {
+      id: 'tpl-3',
+      name: 'Secuencia de Email Marketing (CRM)',
+      description: 'Flujo de automatización para nutrición o bienvenida de suscriptores.',
+      titleTemplate: 'Secuencia CRM - {Cliente}',
+      taskDescription: 'Creación del flujo automatizado de emails, segmentando base de datos y diseñando las plantillas de comunicación.',
+      type: 'CRM',
+      priority: 'Media',
+      checklist: [
+        'Trazar el diagrama de flujo y disparadores (triggers)',
+        'Redacción del copy para secuencia de 3 correos',
+        'Maquetación y diseño responsivo en plataforma de email',
+        'Segmentación de la base de datos de destino',
+        'Envío de pruebas de visualización (desktop y mobile)',
+        'Activar la automatización y monitorizar rebotes'
+      ],
+      relativeDaysStart: 0,
+      relativeDaysEnd: 5
+    },
+    {
+      id: 'tpl-4',
+      name: 'Reunión Estratégica Mensual',
+      description: 'Presentación de resultados del periodo y planificación del mes siguiente.',
+      titleTemplate: 'Reunión Mensual - {Cliente}',
+      taskDescription: 'Agenda y preparación de la reunión mensual con directivos del cliente para evaluar KPIs y ajustar presupuesto.',
+      type: 'Reunión',
+      priority: 'Alta',
+      checklist: [
+        'Definir agenda y enviar link de videoconferencia',
+        'Extraer métricas y KPIs clave de todas las plataformas',
+        'Elaborar el deck de presentación / reporte interactivo',
+        'Llevar a cabo la reunión y tomar apuntes',
+        'Redactar y enviar minuta de acuerdos por correo electrónico'
+      ],
+      relativeDaysStart: 0,
+      relativeDaysEnd: 1
+    }
+  ];
+
+  const [templates, setTemplates] = useState<TaskTemplate[]>(() => {
+    const local = localStorage.getItem('wt_templates');
+    if (local) {
+      try {
+        return JSON.parse(local);
+      } catch (e) {
+        console.error('Error parsing templates', e);
+      }
+    }
+    return DEFAULT_TEMPLATES;
+  });
+
   // Al montar, configurar motor de eventos interactivos de simulación
   useEffect(() => {
     const events = [
@@ -380,6 +471,11 @@ export default function App() {
     localStorage.setItem('wt_activities', JSON.stringify(activities));
   }, [activities]);
 
+  // Guardar plantillas en localStorage
+  useEffect(() => {
+    localStorage.setItem('wt_templates', JSON.stringify(templates));
+  }, [templates]);
+
   // Escuchar cambios de localStorage en tiempo real para sincronización multipestaña (Event + Polling)
   useEffect(() => {
     const handleStorageChange = (e: StorageEvent) => {
@@ -403,6 +499,11 @@ export default function App() {
           setActivities(JSON.parse(e.newValue));
         } catch (err) {}
       }
+      if (e.key === 'wt_templates' && e.newValue) {
+        try {
+          setTemplates(JSON.parse(e.newValue));
+        } catch (err) {}
+      }
     };
     window.addEventListener('storage', handleStorageChange);
 
@@ -411,12 +512,14 @@ export default function App() {
     let lastCompaniesStr = localStorage.getItem('cronograma_companies') || '[]';
     let lastRequestsStr = localStorage.getItem('wt_access_requests') || '[]';
     let lastActivitiesStr = localStorage.getItem('wt_activities') || '[]';
+    let lastTemplatesStr = localStorage.getItem('wt_templates') || '[]';
 
     const interval = setInterval(() => {
       const storedTasksStr = localStorage.getItem('cronograma_tasks');
       const storedCompaniesStr = localStorage.getItem('cronograma_companies');
       const storedRequestsStr = localStorage.getItem('wt_access_requests');
       const storedActivitiesStr = localStorage.getItem('wt_activities');
+      const storedTemplatesStr = localStorage.getItem('wt_templates');
 
       if (storedTasksStr && storedTasksStr !== lastTasksStr) {
         try {
@@ -440,6 +543,12 @@ export default function App() {
         try {
           setActivities(JSON.parse(storedActivitiesStr));
           lastActivitiesStr = storedActivitiesStr;
+        } catch (err) {}
+      }
+      if (storedTemplatesStr && storedTemplatesStr !== lastTemplatesStr) {
+        try {
+          setTemplates(JSON.parse(storedTemplatesStr));
+          lastTemplatesStr = storedTemplatesStr;
         } catch (err) {}
       }
     }, 1000);
@@ -2321,6 +2430,16 @@ export default function App() {
         activeUserRole={activeUserRole}
         activeUserName={activeUserName}
         isApproved={hasAccess}
+        templates={templates}
+        onSaveTemplate={(newTpl) => {
+          setTemplates(prev => [...prev, newTpl]);
+          showToast(`¡Plantilla "${newTpl.name}" creada con éxito!`, 'success');
+        }}
+        onDeleteTemplate={(id) => {
+          setTemplates(prev => prev.filter(t => t.id !== id));
+          showToast('Plantilla eliminada con éxito.', 'success');
+        }}
+        defaultCompanyId={selectedCompanyId !== 'all' ? selectedCompanyId : undefined}
       />
 
       <ReportModal

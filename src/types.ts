@@ -53,3 +53,17 @@ export interface AccessRequest {
   timestamp: string;
 }
 
+export interface TaskTemplate {
+  id: string;
+  name: string;
+  description: string;
+  titleTemplate: string;
+  taskDescription: string;
+  type: TaskType;
+  priority: TaskPriority;
+  checklist: string[];
+  relativeDaysStart: number;
+  relativeDaysEnd: number;
+}
+
+

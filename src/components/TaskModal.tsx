@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Task, Company, TaskType, TaskStatus, TaskPriority, SubTask, Comment } from '../types';
-import { X, Plus, Trash2, Copy, CheckSquare, Calendar, AlertTriangle, Layers, AlignLeft, MessageSquare, Send } from 'lucide-react';
+import { Task, Company, TaskType, TaskStatus, TaskPriority, SubTask, Comment, TaskTemplate } from '../types';
+import { X, Plus, Trash2, Copy, CheckSquare, Calendar, AlertTriangle, Layers, AlignLeft, MessageSquare, Send, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useFeedback } from './FeedbackProvider';
 
@@ -17,6 +17,10 @@ interface TaskModalProps {
   activeUserRole: 'Admin' | 'Equipo' | 'Cliente';
   activeUserName: string;
   isApproved?: boolean;
+  templates?: TaskTemplate[];
+  onSaveTemplate?: (template: TaskTemplate) => void;
+  onDeleteTemplate?: (id: string) => void;
+  defaultCompanyId?: string;
 }
 
 const TASK_TYPES: TaskType[] = ['Contenido', 'Pauta', 'CRM', 'Reunión', 'Entrega', 'Administrativo', 'Otro'];
@@ -102,6 +106,10 @@ export default function TaskModal({
   activeUserRole,
   activeUserName,
   isApproved = true,
+  templates = [],
+  onSaveTemplate,
+  onDeleteTemplate,
+  defaultCompanyId,
 }: TaskModalProps) {
   const { showConfirm, showToast } = useFeedback();
   const [companyId, setCompanyId] = useState('');
@@ -121,6 +129,78 @@ export default function TaskModal({
   const [comments, setComments] = useState<Comment[]>([]);
   const [newCommentText, setNewCommentText] = useState('');
 
+  // --- ESTADOS DE PLANTILLA ---
+  const [isSavingTemplate, setIsSavingTemplate] = useState(false);
+  const [tplName, setTplName] = useState('');
+  const [tplDesc, setTplDesc] = useState('');
+  const [tplTitleTemplate, setTplTitleTemplate] = useState('');
+
+  const handleApplyTemplate = (tpl: TaskTemplate) => {
+    const company = companies.find((c) => c.id === companyId);
+    const clientName = company ? company.name : 'Cliente';
+    const finalTitle = tpl.titleTemplate.replace(/{Cliente}/g, clientName).replace(/{Client}/g, clientName);
+
+    setTitle(finalTitle);
+    setDescription(tpl.taskDescription);
+    setType(tpl.type);
+    setPriority(tpl.priority);
+
+    // Calcular fechas relativas
+    const baseDate = defaultDate ? new Date(defaultDate + 'T12:00:00') : new Date();
+    const start = new Date(baseDate.getTime() + tpl.relativeDaysStart * 24 * 60 * 60 * 1000);
+    const end = new Date(baseDate.getTime() + tpl.relativeDaysEnd * 24 * 60 * 60 * 1000);
+
+    setStartDate(start.toISOString().split('T')[0]);
+    setEndDate(end.toISOString().split('T')[0]);
+
+    // Generar checklist con subtareas de la plantilla
+    const newChecklist: SubTask[] = tpl.checklist.map((text, idx) => ({
+      id: `sub-${Date.now()}-${idx}`,
+      text: text,
+      completed: false
+    }));
+    setChecklist(newChecklist);
+
+    showToast(`¡Plantilla "${tpl.name}" aplicada con éxito!`, 'success');
+  };
+
+  const handleOpenSaveTemplate = () => {
+    let suggestedTitleTemplate = title || 'Nueva Tarea de {Cliente}';
+    if (companyId) {
+      const comp = companies.find(c => c.id === companyId);
+      if (comp && title.includes(comp.name)) {
+        suggestedTitleTemplate = title.replace(new RegExp(comp.name, 'g'), '{Cliente}');
+      }
+    }
+    setTplTitleTemplate(suggestedTitleTemplate);
+    setTplName('');
+    setTplDesc('');
+    setIsSavingTemplate(true);
+  };
+
+  const handleConfirmSaveTemplate = () => {
+    if (!tplName.trim()) {
+      showToast('Por favor introduce un nombre para la plantilla.', 'error');
+      return;
+    }
+    if (onSaveTemplate) {
+      const newTpl: TaskTemplate = {
+        id: `tpl-${Date.now()}`,
+        name: tplName.trim(),
+        description: tplDesc.trim() || 'Plantilla de hito creada por el usuario',
+        titleTemplate: tplTitleTemplate.trim() || title,
+        taskDescription: description.trim(),
+        type,
+        priority,
+        checklist: checklist.map(s => s.text),
+        relativeDaysStart: 0,
+        relativeDaysEnd: 7
+      };
+      onSaveTemplate(newTpl);
+      setIsSavingTemplate(false);
+    }
+  };
+
   // Sincronizar estado cuando se abre o cambia la tarea seleccionada
   useEffect(() => {
     if (task) {
@@ -136,7 +216,10 @@ export default function TaskModal({
       setComments(task.comments || []);
     } else {
       // Nueva tarea con valores predeterminados
-      setCompanyId(companies[0]?.id || '');
+      const initialCompanyId = defaultCompanyId && companies.some((c) => c.id === defaultCompanyId)
+        ? defaultCompanyId
+        : (companies[0]?.id || '');
+      setCompanyId(initialCompanyId);
       setTitle('');
       setDescription('');
       setType('Contenido');
@@ -149,7 +232,7 @@ export default function TaskModal({
       setComments([]);
     }
     setNewSubTaskText('');
-  }, [task, isOpen, companies, defaultDate]);
+  }, [task, isOpen, companies, defaultDate, defaultCompanyId]);
 
   // Manejo de la adición de una subtarea
   const handleAddSubTask = (e: React.FormEvent) => {
@@ -373,6 +456,73 @@ export default function TaskModal({
                       <div className="space-y-0.5">
                         <h4 className="font-extrabold uppercase tracking-wider text-[11px] leading-tight">{deadlineAlert.title}</h4>
                         <p className="font-medium leading-relaxed opacity-90">{deadlineAlert.desc}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Smart-Fill / Plantillas de Hito */}
+                  {!task && templates && templates.length > 0 && (
+                    <div className="p-4 rounded-2xl border border-blue-100 bg-blue-50/15 space-y-3 shadow-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="flex items-center gap-1.5 text-[11px] font-bold text-blue-800 uppercase tracking-wider">
+                          <Sparkles className="w-4 h-4 text-blue-500 animate-pulse" />
+                          ¿Comenzar con una Plantilla Profesional?
+                        </span>
+                        <span className="text-[9px] font-bold text-blue-500/80 bg-blue-50/80 px-2 py-0.5 rounded-full uppercase tracking-widest">
+                          Smart-Fill
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-1">
+                        {templates.map((tpl) => (
+                          <div
+                            key={tpl.id}
+                            className="group p-3 rounded-xl border border-slate-200/80 hover:border-blue-300 bg-white hover:bg-blue-50/30 transition-all flex items-start justify-between gap-2 cursor-pointer relative"
+                            onClick={() => handleApplyTemplate(tpl)}
+                          >
+                            <div className="space-y-1 pr-4 flex-1">
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-xs font-bold text-slate-800 group-hover:text-blue-700 transition-colors">
+                                  {tpl.name}
+                                </span>
+                              </div>
+                              <p className="text-[10px] text-slate-400 line-clamp-2 leading-relaxed group-hover:text-slate-600 transition-colors">
+                                {tpl.description}
+                              </p>
+                              <div className="flex items-center gap-1 pt-1.5">
+                                <span className="text-[8px] font-extrabold px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded uppercase tracking-wider">
+                                  {tpl.type}
+                                </span>
+                                <span className="text-[8px] font-extrabold px-1.5 py-0.5 bg-blue-50 text-blue-600 rounded uppercase tracking-wider">
+                                  {tpl.priority}
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Botón Eliminar Plantilla Personalizada */}
+                            {onDeleteTemplate && !['tpl-1', 'tpl-2', 'tpl-3', 'tpl-4'].includes(tpl.id) && (
+                              <button
+                                type="button"
+                                title="Eliminar plantilla"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  showConfirm({
+                                    title: '¿Eliminar plantilla?',
+                                    message: `¿Estás seguro de que deseas eliminar la plantilla "${tpl.name}" permanentemente?`,
+                                    confirmText: 'Sí, eliminar',
+                                    cancelText: 'Cancelar',
+                                    type: 'danger',
+                                    onConfirm: () => {
+                                      onDeleteTemplate(tpl.id);
+                                    }
+                                  });
+                                }}
+                                className="p-1 rounded-lg text-slate-300 hover:text-rose-600 hover:bg-rose-50 transition-all active:scale-95 cursor-pointer flex-shrink-0"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
+                        ))}
                       </div>
                     </div>
                   )}
@@ -757,7 +907,7 @@ export default function TaskModal({
 
             {/* Footer */}
             <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
-              <div>
+              <div className="flex items-center gap-2">
                 {task && activeUserRole === 'Admin' && (
                   <button
                     id="delete-task-btn"
@@ -778,6 +928,17 @@ export default function TaskModal({
                     className="px-4 py-2 bg-rose-50 text-rose-600 hover:bg-rose-100 hover:text-rose-700 font-semibold rounded-xl text-xs transition-colors cursor-pointer"
                   >
                     Eliminar Tarea
+                  </button>
+                )}
+                {activeUserRole !== 'Cliente' && onSaveTemplate && (
+                  <button
+                    type="button"
+                    onClick={handleOpenSaveTemplate}
+                    title="Guardar esta configuración actual como una nueva plantilla"
+                    className="px-4 py-2 bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-700 font-semibold rounded-xl text-xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-blue-500" />
+                    <span>Guardar como Plantilla</span>
                   </button>
                 )}
               </div>
@@ -806,6 +967,92 @@ export default function TaskModal({
               </div>
             </div>
           </form>
+
+          {/* Overlay Formulario para Guardar Plantilla */}
+          <AnimatePresence>
+            {isSavingTemplate && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="absolute inset-0 z-40 bg-slate-900/60 backdrop-blur-xs p-6 flex items-center justify-center"
+              >
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  className="bg-white rounded-2xl border border-slate-100 shadow-2xl p-6 w-full max-w-md space-y-4 text-left"
+                >
+                  <div className="flex items-center gap-2 text-blue-800">
+                    <Sparkles className="w-5 h-5 text-blue-500 animate-bounce" />
+                    <h4 className="font-extrabold text-sm uppercase tracking-wider">Crear Nueva Plantilla</h4>
+                  </div>
+                  <p className="text-xs text-slate-500 leading-relaxed">
+                    Guarda los campos actuales (Tipo, Prioridad, Checklist de Subtareas y Descripción) como una plantilla reutilizable para acelerar tu flujo de trabajo.
+                  </p>
+
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                        Nombre de la Plantilla *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={tplName}
+                        onChange={(e) => setTplName(e.target.value)}
+                        placeholder="Ej: Setup de Landing Page..."
+                        className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-blue-500 bg-white font-medium text-slate-700"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                        Descripción Breve
+                      </label>
+                      <input
+                        type="text"
+                        value={tplDesc}
+                        onChange={(e) => setTplDesc(e.target.value)}
+                        placeholder="Ej: Actividades iniciales de maquetación..."
+                        className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-blue-500 bg-white text-slate-600"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                        Plantilla de Título (Usa {'{Cliente}'} para autocompletar)
+                      </label>
+                      <input
+                        type="text"
+                        value={tplTitleTemplate}
+                        onChange={(e) => setTplTitleTemplate(e.target.value)}
+                        placeholder="Ej: Landing Page - {Cliente}"
+                        className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-blue-500 bg-white font-mono text-slate-700"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2 justify-end pt-2 border-t border-slate-100">
+                    <button
+                      type="button"
+                      onClick={() => setIsSavingTemplate(false)}
+                      className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg transition-colors cursor-pointer"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleConfirmSaveTemplate}
+                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg transition-colors shadow-xs cursor-pointer"
+                    >
+                      Guardar Plantilla
+                    </button>
+                  </div>
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </motion.div>
       </div>
     </AnimatePresence>
